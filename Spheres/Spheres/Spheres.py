@@ -5,19 +5,25 @@ from random import randint
 theBoard = GameBoard.GameBoard()
 theBoard.DataBoardParse()
 theBoard.EdgeParse()
+theBoard.CalculateZonesPerSphere()
 
 #Setting the board
 theBoard.PopulateAvailableCapitals()
 theBoard.CreatePlayers(4)
-people = list(theBoard.players.keys())
-for p in people:
-    theBoard.players[p].ListArmy()
+for i in range(len(theBoard.players)):
+    theBoard.players[i].ListArmy()
+theBoard.ArrangeTurnDeck()
+theBoard.ListTurnDeck()
 
 #First players actions
-origin = theBoard.players[people[0]].capital
-origin_ID = theBoard.FindZoneByName(origin)
-possible_destinations = theBoard.ZoneConnections(origin_ID)
-destination = possible_destinations[randint(0, len(possible_destinations) - 1)]
-theBoard.MoveArmyIfTerrainAllows(people[0],origin,destination,1)
-theBoard.players[people[0]].ListArmy()
+while len(theBoard.turn_deck) > 0:
+    current_player = theBoard.ExecutePlayersTurn()
+    theBoard.players[current_player].ListArmy()
+
+#First reinforcement
+(nSpheres,nCaps) = theBoard.CheckSpheres()
+theBoard.ArrangeMovilizationDeck()
+while len(theBoard.movilization_order) > 0:
+    current_player = theBoard.ExecutePlayersMovilization()
+    theBoard.players[current_player].ListArmy()
 
