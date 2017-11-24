@@ -21,9 +21,11 @@ while len(theBoard.turn_deck) > 0:
     theBoard.players[current_player].ListArmy()
 
 #First reinforcement
-(nSpheres,nCaps) = theBoard.CheckSpheres()
+(nSpheres,nCaps,_) = theBoard.CheckSpheres()
 theBoard.ArrangeMovilizationDeck()
 while len(theBoard.movilization_order) > 0:
     current_player = theBoard.ExecutePlayersMovilization()
     theBoard.players[current_player].ListArmy()
+
+theBoard.AI_LoadScenario()
 
