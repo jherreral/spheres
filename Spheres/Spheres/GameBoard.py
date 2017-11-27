@@ -187,26 +187,30 @@ class GameBoard:
         wants_to_attack = True
         while True:
             #->Instakill by cards
-            if self.players[attacker_id].army[placeA] > 1:
+            if self.players[attacker_id].army[placeA] > 1 or self.zones_data[self.FindZoneByName(placeA)].sphere == 0:
                 #->Instakill by cards
                 if placeB in self.players[defender_id].army:
                     if not wants_to_attack:
                         break
                     print("Ok. Here we go.")
                     #->Allow attacker to select number of units/dices
-                    attacking_dice_amount = self.players[attacker_id].army[placeA] - 1
-                    defending_dice_amount = self.players[defender_id].army[placeB]
+                    attacking_dice_amount = min(self.players[attacker_id].army[placeA] - 1, 5) \
+                                            if self.zones_data[self.FindZoneByName(placeA)].sphere != 0 \
+                                            else min(self.players[attacker_id].army[placeA], 5)
+                    defending_dice_amount = min(self.players[defender_id].army[placeB], 5)
                     print("Attacker ")
                     attacker_kills = self.RollAndGroupDice(attacking_dice_amount)
                     print("Defender ")
                     defender_kills = self.RollAndGroupDice(defending_dice_amount)
+                    print("Defender ")
                     (defender_bonus_kills, defender_bonus_blocks) = self.RollBonusDice(defender_bonus_dice)
+                    
 
                     attacker_losses = min(attacking_dice_amount, defender_kills + defender_bonus_kills)
                     self.removeFromPlayerArmy(attacker_id,placeA,attacker_losses)
                     print("Attacker loses {} units".format(attacker_losses))
 
-                    defender_losses = min(defending_dice_amount, attacker_kills)
+                    defender_losses = min(defending_dice_amount, max(0, attacker_kills - defender_bonus_blocks))
                     self.removeFromPlayerArmy(defender_id,placeB,defender_losses)
                     print("Defender loses {} units".format(defender_losses))
 
@@ -218,7 +222,7 @@ class GameBoard:
                             print("Resistance rule applied: 1 unit remains in defending zone\n")
                         break
 
-                    if self.players[attacker_id].army[placeA] > 1 and placeB not in self.players[attacker_id].army:
+                    if self.players[attacker_id].army[placeA] > 1 and placeB not in self.players[defender_id].army:
                         self.removeFromPlayerArmy(attacker_id, placeA, attacking_dice_amount - attacker_losses)
                         self.addToPlayerArmy(attacker_id, placeB, attacking_dice_amount - attacker_losses)
                         print("{} conquered {}\n".format(self.players[attacker_id].name, placeB))
@@ -272,6 +276,7 @@ class GameBoard:
                 n_kills += 1
             if n == 2:
                 n_blocks += 1
+        print("rolled {} kills and {} blocks".format(n_kills, n_blocks))
         return (n_kills,n_blocks)
 
     def movePlayerArmy(self,player_id,placeA,placeB,n):
@@ -332,26 +337,27 @@ class GameBoard:
             if self.round > 1:
                 for zones in self.players[i].army:
                     if self.zones_data[self.FindZoneByName(zones)].petrol:
-                        self.turn_deck.append(p)
+                        self.turn_deck.append(i)
         random.shuffle(self.turn_deck)
         return 0
 
     def CalculateProdSpheCaps(self):
         nPlayers = len(self.players)
         total_productions = [0]*nPlayers
-        (nSphes,nCaps,nStartLocs) = self.CheckSpheres()
+        (nSphes,nCaps,nStartLocs,nPetrols) = self.CheckSpheres()
         for i in range(nPlayers):
             for zone in self.players[i].army:
                 total_productions[i] = total_productions[i] + self.zones_data[self.FindZoneByName(zone)].production
-        return (total_productions, nSphes, nCaps, nStartLocs)
+        return (total_productions, nSphes, nCaps, nStartLocs, nPetrols)
 
     def ArrangeMovilizationDeck(self):
         nPlayers = len(self.players)
         players_to_sort = []
-        (total_productions, nSphes, nCaps, nStartLocs) = self.CalculateProdSpheCaps()
+        (total_productions, nSphes, nCaps, nStartLocs, nPetrols) = self.CalculateProdSpheCaps()
         for i in range(nPlayers):
-            players_to_sort.append((i,) + (total_productions[i],) + (nSphes[i],) + (nCaps[i],))
+            players_to_sort.append((i,) + (total_productions[i],) + (nSphes[i],) + (nCaps[i],) + (nPetrols[i],))
 
+        sorted_by_petrol = sorted(players_to_sort, key = lambda x:x[4])
         sorted_by_cap = sorted(players_to_sort, key = lambda x:x[3])
         sorted_by_sph = sorted(sorted_by_cap, key = lambda x:x[2])
         sorted_by_pro = sorted(sorted_by_sph, key = lambda x:x[1], reverse = True)
@@ -366,6 +372,7 @@ class GameBoard:
         nSpheres = [0]*nPlayers
         nCapitals = [0]*nPlayers
         nStartLocs = [0]*nPlayers
+        nPetrols = [0]*nPlayers
         for i in range(nPlayers):
             sphere_counter = copy.copy(self.zones_per_sphere)
             for zone in self.players[i].army:
@@ -374,15 +381,17 @@ class GameBoard:
                     sphere_counter[current_sphere - 1] = sphere_counter[current_sphere - 1] - 1
                 if self.zones_data[self.FindZoneByName(zone)].capital:
                     nCapitals[i] += 1
+                if self.zones_data[self.FindZoneByName(zone)].petrol:
+                    nPetrols[i] += 1
                 if zone in self.startLocations:
                     nStartLocs[i] += 1
             nSpheres[i]=sphere_counter.count(0)
-        return (nSpheres,nCapitals,nStartLocs)
+        return (nSpheres,nCapitals,nStartLocs,nPetrols)
 
     def ListTurnDeck(self):
         print("The 'secret' turn deck order is:\n")
         for p in self.turn_deck:
-            print("{}\n".format(p))
+            print("{}\n".format(self.players[p].name))
         return 0
 
     def ExecutePlayersTurn(self):
@@ -403,7 +412,7 @@ class GameBoard:
     def ExecutePlayersMovilization(self):
         current_player_id = self.movilization_order[0]
         #->Count other bonuses (cards)
-        (prod, nSph, nCap, nStartLocs) = self.CalculateProdSpheCaps()
+        (prod, nSph, _, nStartLocs,_) = self.CalculateProdSpheCaps()
         bonus = 0
         total_units = 1 + math.floor(prod[current_player_id]/3) + nSph[current_player_id] + nStartLocs[current_player_id]
         print("It's {}'s turn to movilize units! You have {} unit(s) left to place\n".format(self.players[current_player_id].name,total_units))
@@ -456,6 +465,8 @@ class GameBoard:
                 units = int(f.readline())
                 self.players[i].army[zone] = units
         f.close()
+        for i in range(len(self.players)):
+            self.players[i].ListArmy()
         return 0
 
 
