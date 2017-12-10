@@ -33,6 +33,8 @@ class GameBoard:
         self.availableCapitals = []
         self.movilization_order = []
         self.turn_deck = []
+        self.special_deck = []
+        self.discard_deck = []
         self.players = []
         self.zones_per_sphere = [0]*18
         self.startLocations = []

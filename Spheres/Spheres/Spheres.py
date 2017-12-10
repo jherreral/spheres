@@ -1,4 +1,5 @@
 import GameBoard
+import UI
 from random import randint
 
 #Loading data
@@ -6,6 +7,15 @@ theBoard = GameBoard.GameBoard()
 theBoard.DataBoardParse()
 theBoard.EdgeParse()
 theBoard.CalculateZonesPerSphere()
+
+#Creating UI
+theUI = UI.UI(theBoard)
+theUI.loadImages()
+theUI.CreatePanels()
+theUI.startUI()
+while 1:
+    theUI.update()
+
 
 #Setting the board
 theBoard.PopulateAvailableCapitals()
