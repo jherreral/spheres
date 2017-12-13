@@ -24,11 +24,43 @@ class Player:
         for x in self.army.keys():
             print("{}:{}\n".format(x,self.army[x]))
  
+class Card:
+    def __init__(self, **kwargs):
+        self.name = None
+        self.owner = None
+        return super().__init__(**kwargs)
+
+class CardManager:
+    def __init__(self, board):
+        self.board = (GameBoard)board
+        pass
+
+    def DrawCard(self):
+        pass
+
+    def DespairCard(self):
+        pass
+
+    def Select(self,name):
+        pass
+
+    def cResearch(self):
+        print("Choose 1 among these cards")
+        cardsToChoose = [self.board.card_deck[0], self.board.card_deck[1], self.board.card_deck[2]]
+        #->Allow card selection
+        selected = 1
+        self.board.players[] 
+        for i in range(3):
+            board.discard_deck.append(board.card_deck[0])
+            board.card_deck.pop(0)
+
+
 
 class GameBoard:
     def __init__(self, **kwargs):
         self.round = 0
         self.zones_data = []
+        self.card_data = {}
         self.edges_pairs = []
         self.availableCapitals = []
         self.movilization_order = []
@@ -36,6 +68,8 @@ class GameBoard:
         self.players = []
         self.zones_per_sphere = [0]*18
         self.startLocations = []
+        self.card_deck = []
+        self.discard_deck = []
 
     def DataBoardParse(self):
         f = open("SpheresDataBoard.csv","r")
