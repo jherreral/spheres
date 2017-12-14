@@ -1,6 +1,8 @@
 import copy
 import math
 import random
+import queue
+from Selection import Selection
 from random import randint
 
 class Zone:
@@ -26,7 +28,7 @@ class Player:
  
 
 class GameBoard:
-    def __init__(self, **kwargs):
+    def __init__(self, receiveQueue, sendQueue):
         self.round = 0
         self.zones_data = []
         self.edges_pairs = []
@@ -38,6 +40,8 @@ class GameBoard:
         self.players = []
         self.zones_per_sphere = [0]*18
         self.startLocations = []
+        self.receiveQueue = receiveQueue
+        self.sendQueue = sendQueue
 
     def DataBoardParse(self):
         f = open("SpheresDataBoard.csv","r")
@@ -401,6 +405,7 @@ class GameBoard:
         print("Now is {}'s turn.\n".format(self.players[current_player_id].name))
         print("You can (1)move/attack or (2)pass:")
         #->Allow some selection action
+        #->CARD TIME
         option = 1
         if option == 1:
             #->Allow some selection of zones to move

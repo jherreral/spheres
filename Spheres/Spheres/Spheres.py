@@ -1,21 +1,31 @@
 import GameBoard
 import UI
+import queue
 from random import randint
 
+def UIThread(receiveQueue, sendQueue):
+    ### Run UI in this thread
+    theUI = UI.UI(receiveQueue)
+    theUI.loadImages()
+    theUI.CreatePanels()
+    theUI.startUI()
+    while 1:
+        theUI.update()
+
+#Create queue objects for thread communication
+ToUI_queue = queue.Queue()
+ToGB_queue = queue.Queue()
+
 #Loading data
-theBoard = GameBoard.GameBoard()
+theBoard = GameBoard.GameBoard(ToGB_queue, ToUI_queue)
 theBoard.DataBoardParse()
 theBoard.EdgeParse()
 theBoard.CalculateZonesPerSphere()
 
-#Creating UI
-theUI = UI.UI(theBoard)
-theUI.loadImages()
-theUI.CreatePanels()
-theUI.startUI()
-while 1:
-    theUI.update()
-
+#Start UI thread
+UI_thread = threading.Thread(target=UIThread, args=(ToUI_queue,ToGB_queue,))
+UI_thread.daemon = True
+UI_thread.start()
 
 #Setting the board
 theBoard.PopulateAvailableCapitals()

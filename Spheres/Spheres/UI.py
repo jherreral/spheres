@@ -1,8 +1,23 @@
 import pygame,sys,os
 import GameBoard
+import Selection
+import threading
+import queue
+
+class SelectionPlayer(Selection.Selection):
+    def ShowSelection():
+        pass
+
+class SelectionCard(Selection.Selection):
+    def ShowSelection():
+        pass
+
+class SelectionDice(Selection.Selection):
+    def ShowSelection():
+        pass 
 
 class UI:
-    def __init__(self, board):
+    def __init__(self, receiveQueue):
         self.turnImages = {}
         self.specialImages = {}
         self.startingImages = {}
@@ -10,7 +25,16 @@ class UI:
         self.screen = None
 
         self.objectList = []
-        self.theBoard = board
+
+        boardReady = False
+        while not boardReady:
+            if not receiveQueue.empty():
+                self.theBoard = receiveQueue[0]
+                boardReady = True
+            pygame.event.pump()
+            keys = pygame.key.get_pressed()
+            if keys[K_ESCAPE]:
+                boardReady = True
         return super().__init__()
 
     def loadImages(self):
