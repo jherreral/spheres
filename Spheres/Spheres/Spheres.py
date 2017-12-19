@@ -5,7 +5,7 @@ from random import randint
 
 def UIThread(receiveQueue, sendQueue):
     ### Run UI in this thread
-    theUI = UI.UI(receiveQueue)
+    theUI = UI.UI(receiveQueue, sendQueue)
     theUI.loadImages()
     theUI.CreatePanels()
     theUI.startUI()
@@ -21,9 +21,10 @@ theBoard = GameBoard.GameBoard(ToGB_queue, ToUI_queue)
 theBoard.DataBoardParse()
 theBoard.EdgeParse()
 theBoard.CalculateZonesPerSphere()
+theBoard.FirstBoardForUI()
 
 #Start UI thread
-UI_thread = threading.Thread(target=UIThread, args=(ToUI_queue,ToGB_queue,))
+UI_thread = UI.threading.Thread(target=UIThread, args=(ToUI_queue,ToGB_queue,))
 UI_thread.daemon = True
 UI_thread.start()
 
@@ -49,6 +50,7 @@ for i in range(len(theBoard.players)):
 #    theBoard.players[current_player].ListArmy()
 
 theBoard.AI_LoadScenario()
+theBoard.UpdateBoardForUI()
 while theBoard.round < 6:
     theBoard.round += 1
 

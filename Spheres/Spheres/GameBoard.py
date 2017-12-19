@@ -43,6 +43,20 @@ class GameBoard:
         self.receiveQueue = receiveQueue
         self.sendQueue = sendQueue
 
+    def FirstBoardForUI(self):
+        self.sendQueue.put(self)
+
+    def UpdateBoardForUI(self):
+        self.sendQueue.put(self)
+        self.sendQueue.join()
+
+    def SendAndWaitSelection(self,selectionX):
+        self.sendQueue.put(selectionX)
+        self.sendQueue.join()
+        response = self.receiveQueue.get()
+        self.receiveQueue.task_done()
+        return response
+
     def DataBoardParse(self):
         f = open("SpheresDataBoard.csv","r")
         for x in range(0, 100):
@@ -147,8 +161,8 @@ class GameBoard:
         optionB = self.availableCapitals[random_number]
         del self.availableCapitals[random_number]
         print("You can choose between {} and {}\n".format(optionA,optionB))
-        #Allow some selection
-        selected = optionA
+        selectionFromUI = self.SendAndWaitSelection(Selection([optionA,optionB],'Card'))
+        selected = selectionFromUI
         print("Good, your selected capital is {}. 3 units will be added here\n".format(selected))
         self.startLocations.append(selected)
         self.players[player_id].army[selected] = 3
