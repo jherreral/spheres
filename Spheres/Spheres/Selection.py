@@ -3,3 +3,6 @@ class Selection:
         self.options = options
         self.selection = None
         self.type = type
+
+    def setSelection(self,select):
+        self.selection = select
