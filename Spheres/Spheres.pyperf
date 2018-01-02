@@ -1,0 +1,12 @@
+<?xml version="1.0"?>
+<ProfilingTarget xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <ProjectTarget>
+    <TargetProject>51fc8a14-f113-496d-bb8f-b16af6c63ed3</TargetProject>
+    <FriendlyName>Spheres</FriendlyName>
+  </ProjectTarget>
+  <Reports>
+    <Report>
+      <Filename>C:\Users\Jaime Herrera\AppData\Local\Temp\Spheres_20171227.vsp</Filename>
+    </Report>
+  </Reports>
+</ProfilingTarget>

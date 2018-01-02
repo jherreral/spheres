@@ -26,6 +26,11 @@ class Player:
         for x in self.army.keys():
             print("{}:{}\n".format(x,self.army[x]))
  
+class MoveAttackSelection(Selection):
+    def __init__(self, options, type, theBoard):
+        super().__init__(options, type)
+        for idx,option in enumerate(options):
+            options[idx] = Selection(theBoard.ZoneConnections(theBoard.FindZoneByName(option)),"Map")
 
 class GameBoard:
     def __init__(self, receiveQueue, sendQueue):
@@ -136,6 +141,16 @@ class GameBoard:
                 return i
             i = i + 1
 
+    def CreateMoveAttackSelection(self,player_id):
+        options = []
+        player_zones = list(self.players[player_id].army.keys())
+        possible_origins = []
+        for zone in self.players[player_id].army:
+            if self.players[player_id].army[zone] > 1:
+                localOptions = self.ZoneConnections(self.FindZoneByName(zone))
+                options.append(Selection(localOptions,zone))
+        return Selection(options,"MoveAttack")
+
     def CreatePlayers(self,n):
         for player_id in range(n):
             #->Allow name selection
@@ -161,7 +176,8 @@ class GameBoard:
         optionB = self.availableCapitals[random_number]
         del self.availableCapitals[random_number]
         print("You can choose between {} and {}\n".format(optionA,optionB))
-        selected = self.SendAndWaitSelection(Selection([optionA,optionB],'Card'))
+        selected = self.SendAndWaitSelection(Selection([optionA,optionB],'Map'))
+        #selected = self.SendAndWaitSelection(Selection([optionA,optionB],'Card'))
         print("Good, your selected capital is {}. 3 units will be added here\n".format(selected))
         self.startLocations.append(selected)
         self.players[player_id].army[selected] = 3
@@ -417,11 +433,12 @@ class GameBoard:
         current_player_id = self.turn_deck[0]
         print("Now is {}'s turn.\n".format(self.players[current_player_id].name))
         print("You can (1)move/attack or (2)pass:")
-        #->Allow some selection action
         #->CARD TIME
+        decision = self.SendAndWaitSelection(self.CreateMoveAttackSelection(current_player_id))
+        
         option = 1
         if option == 1:
-            #->Allow some selection of zones to move
+            #->Allow some selection of zones to move and which amount
             (origin,destination) = self.AI_ChooseRandomTerrainsToMove(current_player_id)
             self.MoveArmyIfTerrainAllows(current_player_id,origin,destination,1)
         if option == 2:

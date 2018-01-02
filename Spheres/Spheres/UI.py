@@ -106,6 +106,7 @@ class UI:
         theUI = self
         self.objectList.append(UI_SpecialDeck(theUI,0,540,270,230,(220,120,0)))
         self.objectList.append(UI_Map(theUI,260,0,827,568,(0,0,150)))
+        #self.objectList.append(SelectionMap(["Argen","Chile"],"Map",self.objectList[1],theUI,260,0,827,568,(100,0,0)))
 
     def pollQueue(self):
         while not self.receiveQueue.empty():
@@ -119,6 +120,12 @@ class UI:
                 if typeOfSelection == "Pause":
                     self.objectList.append(SelectionPanel(somethingFromGB.options,typeOfSelection,self,450,450,200,200,(0,0,100)))
                     self.receiveQueue.task_done()
+                if typeOfSelection == "Map":
+                    self.objectList.append(SelectionMap(somethingFromGB.options,typeOfSelection,self.objectList[1],self,260,0,827,568,(100,0,0)))
+                    self.receiveQueue.task_done()
+                if typeOfSelection == "MoveAttack":
+                    self.objectList.append(SelectionTurn(somethingFromGB.options,typeOfSelection,self.objectList[1],self,260,0,827,568,(100,0,0)))
+                    self.receiveQueue.task_done()
             if typeOfObject is GameBoard.GameBoard:
                 self.theBoard = somethingFromGB
                 self.receiveQueue.task_done()
@@ -126,7 +133,9 @@ class UI:
     def update(self):
         self.pollQueue()
         if pygame.event.peek(pygame.QUIT):
-            return False
+            self.objectList.clear()
+            pygame.quit()
+            return True
         mouseButtonEvents = pygame.event.get(pygame.MOUSEBUTTONDOWN)
         if mouseButtonEvents:
             lastMouseButtonEvent = mouseButtonEvents[len(mouseButtonEvents)-1]
@@ -142,6 +151,7 @@ class UI:
                 continue
             i.update()
         pygame.display.flip()
+        return False
 
 class UI_Panel:
     def __init__(self, UI, left, top, width, height, background):
@@ -168,13 +178,16 @@ class MP_Zone():
         self.position = position
         self.mask = mask
 
+    def copy(self):
+        return MP_Zone(self.name,self.surf.copy(),self.rect.copy(),self.position,self.mask)
+
 
 class UI_Map(UI_Panel):
     def __init__(self, UI, left, top, width, height, background):
         super().__init__(UI, left, top, width, height, background)
         self.map = self.theUI.imageBank["MP"]["MP_Board"]
         self.map = pygame.transform.scale(self.map,(self.width,self.height))
-        self.zoneList = []
+        self.objectList = []
         self.ParseZones()
 
     def ParseZones(self):
@@ -186,13 +199,13 @@ class UI_Map(UI_Panel):
             surf = self.theUI.imageBank["MP"]["MP_"+name]
             rect = surf.get_rect()
             rect.move_ip(x,y)
-            self.zoneList.append(MP_Zone(name,surf,rect,(x,y),pygame.mask.from_surface(surf)))
+            self.objectList.append(MP_Zone(name,surf,rect,(x,y),pygame.mask.from_surface(surf)))
         f.close()
 
     def update(self):
         self.theUI.screen.blit(self.map,self.myRect)
         mPos = pygame.mouse.get_pos()
-        for zone in self.zoneList:
+        for zone in self.objectList:
             maskSize = zone.mask.get_size()
             maskX = mPos[0]-zone.position[0]-self.left
             maskY = mPos[1]-zone.position[1]-self.top
@@ -200,6 +213,102 @@ class UI_Map(UI_Panel):
                 if zone.mask.get_at((maskX,maskY)):
                     self.theUI.screen.blit(zone.surf, zone.rect.move(self.left,self.top))
 
+    def pressed(self, event):
+        pass
+
+class SelectionMap(Selection, UI_Panel):
+    def __init__(self, options, type, map, UI,  left, top, width, height, background):
+        Selection.__init__(self,options, type)
+        UI_Panel.__init__(self,UI, left, top, width, height, background)
+        
+        self.theMap = map
+        self.objectList = []
+        self.jobDone = False
+
+        for option in self.options:
+            for zone in self.theMap.objectList:
+                if zone.name == option:
+                    self.objectList.append(zone.copy())
+        color = (200,200,0)
+        for zone in self.objectList:
+            zone.surf.fill(color,None,pygame.BLEND_RGB_MULT)
+
+    def update(self):
+        if not self.selection == None:
+            self.sendSelection()
+            self.jobDone = True
+            return
+
+        for zone in self.objectList:
+            self.theUI.screen.blit(zone.surf,zone.rect.move(self.theMap.left,self.theMap.top))
+
+    def pressed(self, event):
+        mPos = event.pos
+        for zone in self.objectList:
+            maskSize = zone.mask.get_size()
+            maskX = mPos[0]-zone.position[0]-self.left
+            maskY = mPos[1]-zone.position[1]-self.top
+            if maskX in range(0,maskSize[0]) and maskY in range(0,maskSize[1]):
+                if zone.mask.get_at((maskX,maskY)):
+                    self.selection = zone.name
+    
+    def sendSelection(self):
+        response = Selection(self.options,self.type)
+        response.setSelection(self.selection)
+        self.theUI.sendQueue.put(response)
+
+class SelectionTurn(Selection, UI_Panel):
+    def __init__(self, options, type, map, UI, left, top, width, height, background):
+        Selection.__init__(self,options, type)
+        UI_Panel.__init__(self,UI, left, top, width, height, background)
+
+        self.theMap = map
+        self.objectList = []
+        self.pressableList = []
+        self.jobDone = False
+        self.selectedOrigin = None
+
+        for selectionObject in self.options:
+            for zone in self.theMap.objectList:
+                if zone.name == selectionObject.type:
+                    self.objectList.append((selectionObject,zone.copy()))
+        color = (200,200,0)
+        for dummy,zone in self.objectList:
+            zone.surf.fill(color,None,pygame.BLEND_RGB_MULT)
+        self.pressableList = self.objectList
+
+    def update(self):
+        if not self.selection == None:
+            self.sendSelection()
+            self.jobDone = True
+            return
+
+        for dummy,zone in self.objectList:
+            self.theUI.screen.blit(zone.surf,zone.rect.move(self.theMap.left,self.theMap.top))
+
+    def pressed(self, event):
+        mPos = event.pos
+        for selectionObject,zone in self.pressableList:
+            maskSize = zone.mask.get_size()
+            maskX = mPos[0]-zone.position[0]-self.left
+            maskY = mPos[1]-zone.position[1]-self.top
+            if maskX in range(0,maskSize[0]) and maskY in range(0,maskSize[1]):
+                if zone.mask.get_at((maskX,maskY)):
+                    if not self.selectedOrigin == None:
+                        #Mostrar selector de cantidad
+                        n = 1
+                        self.selection = (self.selectedOrigin,zone.name,n)
+                        break
+                    else:
+                        color2 = (250,250,0)
+                        self.selectedOrigin = zone.name
+                        self.pressableList.clear()
+                        for option in selectionObject.options:
+                            for zone in self.theMap.objectList:
+                                if zone.name == option:
+                                    self.objectList.append((selectionObject,zone.copy()))
+                                    self.objectList[len(self.objectList)-1][1].surf.fill(color2,None,pygame.BLEND_RGB_MULT)
+                                    self.pressableList.append((selectionObject,zone.copy()))
 
 
 class UI_SpecialDeck(UI_Panel):
@@ -217,8 +326,7 @@ class UI_SpecialDeck(UI_Panel):
         pygame.draw.rect(self.theUI.screen, self.background, self.myRect)
         for object in self.objectList:
             object.update()
-
-        
+  
 class UI_Button:
     def __init__(self,buttonName,UI,left,top,width,height,ref,imageName):
         self.buttonName = buttonName
@@ -312,7 +420,6 @@ class SelectionPanel(Selection,UI_Panel):
                 self.jobDone = True
                 break
             button.update()
-
 
 class UI_Hand(UI_Panel):
     
