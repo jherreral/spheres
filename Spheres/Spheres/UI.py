@@ -177,6 +177,7 @@ class MP_Zone():
         self.rect = rect
         self.position = position
         self.mask = mask
+        self.units = None
 
     def copy(self):
         return MP_Zone(self.name,self.surf.copy(),self.rect.copy(),self.position,self.mask)
@@ -202,10 +203,36 @@ class UI_Map(UI_Panel):
             self.objectList.append(MP_Zone(name,surf,rect,(x,y),pygame.mask.from_surface(surf)))
         f.close()
 
+    def getSurfaceOfNumberFromFontImage(self,number,color):
+        return self.theUI.imageBank["UI"]["numbers"].subsurface(pygame.Rect(48*(number-1),28*color,48,28))
+
+    def getPlayerColor(self,player):
+        colors = {'Total':0,'Milit':1,'Inter':2,'Democ':3,'Dynas':4,'Theoc':5,'Commu':6,'Calip':7}
+        return colors[player]
+
+    def updateNumberInsideZones(self):
+        for mapzone in self.objectList:
+            set = False
+            for player in self.theUI.theBoard.players:
+                if set:
+                    break
+                for zonename in player.army:
+                    if set:
+                        break
+                    if zonename == mapzone.name:
+                        mapzone.units = self.getSurfaceOfNumberFromFontImage(player.army[zonename],self.getPlayerColor(player.faction))
+                        set = True
+            if not set:
+                mapzone.units = pygame.Surface((0,0))
+                set = True
+
+
     def update(self):
+        self.updateNumberInsideZones()
         self.theUI.screen.blit(self.map,self.myRect)
         mPos = pygame.mouse.get_pos()
         for zone in self.objectList:
+            self.theUI.screen.blit(zone.units,zone.position)
             maskSize = zone.mask.get_size()
             maskX = mPos[0]-zone.position[0]-self.left
             maskY = mPos[1]-zone.position[1]-self.top
@@ -309,7 +336,11 @@ class SelectionTurn(Selection, UI_Panel):
                                     self.objectList.append((selectionObject,zone.copy()))
                                     self.objectList[len(self.objectList)-1][1].surf.fill(color2,None,pygame.BLEND_RGB_MULT)
                                     self.pressableList.append((selectionObject,zone.copy()))
-
+    
+    def sendSelection(self):
+        response = Selection(self.options,self.type)
+        response.setSelection(self.selection)
+        self.theUI.sendQueue.put(response)
 
 class UI_SpecialDeck(UI_Panel):
 

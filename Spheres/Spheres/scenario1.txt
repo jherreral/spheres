@@ -1,6 +1,6 @@
 2
 3
-Harturo,6
+Harturo,Total,6
 Brasi
 3
 Chile
@@ -13,7 +13,7 @@ Panam
 1
 Mexic
 5
-Bernardo,7
+Bernardo,Milit,7
 Calif
 4
 Texas
@@ -28,7 +28,7 @@ NtCan
 2
 Alask
 3
-Carolina,5
+Carolina,Inter,5
 Ausst
 2
 Sydne

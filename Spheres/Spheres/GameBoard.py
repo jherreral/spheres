@@ -18,6 +18,7 @@ class Zone:
 class Player:
     def __init__(self):
         self.name = None
+        self.faction = None
         self.army = {}
         self.hand = []
 
@@ -155,9 +156,10 @@ class GameBoard:
         for player_id in range(n):
             #->Allow name selection
             names = ['Harturo','Bernardo','Carolina','Daniel','Eleonora','Francis','Gabo']
-            selected_name = names[player_id]
+            factions = ['Total','Milit','Inter','Democ','Dynas','Theoc','Commu']
             self.players.append(Player())
-            self.players[player_id].name = selected_name
+            self.players[player_id].name = names[player_id]
+            self.players[player_id].faction = factions[player_id]
             self.OfferCapitals(player_id)
 
     def PopulateAvailableCapitals(self):
@@ -436,13 +438,16 @@ class GameBoard:
         #->CARD TIME
         decision = self.SendAndWaitSelection(self.CreateMoveAttackSelection(current_player_id))
         
-        option = 1
-        if option == 1:
-            #->Allow some selection of zones to move and which amount
-            (origin,destination) = self.AI_ChooseRandomTerrainsToMove(current_player_id)
-            self.MoveArmyIfTerrainAllows(current_player_id,origin,destination,1)
-        if option == 2:
-            pass
+        if not decision == "pass":
+            self.MoveArmyIfTerrainAllows(current_player_id,decision[0],decision[1],decision[2])
+
+        #option = 1
+        #if option == 1:
+        #    #->Allow some selection of zones to move and which amount
+        #    (origin,destination) = self.AI_ChooseRandomTerrainsToMove(current_player_id)
+        #    self.MoveArmyIfTerrainAllows(current_player_id,origin,destination,1)
+        #if option == 2:
+        #    pass
         self.turn_deck.pop(0)
         self.SendAndWaitSelection(Selection(["Pause"],"Pause"))
         return current_player_id
@@ -495,8 +500,9 @@ class GameBoard:
             aux = f.readline()
             aux = aux.rstrip()
             aux2 = aux.split(",")
-            (name,nZones) = (aux2[0],int(aux2[1]))
+            (name,faction,nZones) = (aux2[0],aux2[1],int(aux2[2]))
             self.players[i].name = name
+            self.players[i].faction = faction
             for j in range(nZones):
                 zone = f.readline()
                 zone = zone.rstrip()
