@@ -1,8 +1,8 @@
 import pygame,sys,os
 import GameBoard
 from Selection import Selection
-import threading
 import queue
+import threading
 
 
 class UI:
@@ -90,8 +90,7 @@ class UI:
         boardReady = False
         while not boardReady:
             if not self.receiveQueue.empty():
-                self.theBoard = self.receiveQueue.get()
-                self.receiveQueue.task_done()
+                self.GB_getInfoAndUpdate(self.receiveQueue.get())
                 boardReady = True
 
         pygame.init()
@@ -104,8 +103,8 @@ class UI:
 
     def CreatePanels(self):
         theUI = self
-        self.objectList.append(UI_SpecialDeck(theUI,0,540,270,230,(220,120,0)))
         self.objectList.append(UI_Map(theUI,260,0,827,568,(0,0,150)))
+        self.objectList.append(UI_SpecialDeck(theUI,0,540,270,230,(220,120,0)))
         #self.objectList.append(SelectionMap(["Argen","Chile"],"Map",self.objectList[1],theUI,260,0,827,568,(100,0,0)))
 
     def pollQueue(self):
@@ -121,14 +120,19 @@ class UI:
                     self.objectList.append(SelectionPanel(somethingFromGB.options,typeOfSelection,self,450,450,200,200,(0,0,100)))
                     self.receiveQueue.task_done()
                 if typeOfSelection == "Map":
-                    self.objectList.append(SelectionMap(somethingFromGB.options,typeOfSelection,self.objectList[1],self,260,0,827,568,(100,0,0)))
+                    self.objectList.append(SelectionMap(somethingFromGB.options,typeOfSelection,self.objectList[0],self,260,0,827,568,(100,0,0)))
                     self.receiveQueue.task_done()
                 if typeOfSelection == "MoveAttack":
-                    self.objectList.append(SelectionTurn(somethingFromGB.options,typeOfSelection,self.objectList[1],self,260,0,827,568,(100,0,0)))
+                    self.objectList.append(SelectionTurn(somethingFromGB.options,typeOfSelection,self.objectList[0],self,260,0,827,568,(100,0,0)))
                     self.receiveQueue.task_done()
             if typeOfObject is GameBoard.GameBoard:
-                self.theBoard = somethingFromGB
-                self.receiveQueue.task_done()
+                self.GB_getInfoAndUpdate(somethingFromGB)
+
+    def GB_getInfoAndUpdate(self,GBreceived):
+        self.theBoard = GBreceived
+        self.objectList[0].GB_getNumberOfUnitsInZones()
+        self.objectList[1].GB_getNewTopCard()
+        self.receiveQueue.task_done()
 
     def update(self):
         self.pollQueue()
@@ -204,13 +208,15 @@ class UI_Map(UI_Panel):
         f.close()
 
     def getSurfaceOfNumberFromFontImage(self,number,color):
+        if number == 0:
+            return pygame.Surface((0,0))
         return self.theUI.imageBank["UI"]["numbers"].subsurface(pygame.Rect(48*(number-1),28*color,48,28))
 
     def getPlayerColor(self,player):
         colors = {'Total':0,'Milit':1,'Inter':2,'Democ':3,'Dynas':4,'Theoc':5,'Commu':6,'Calip':7}
         return colors[player]
 
-    def updateNumberInsideZones(self):
+    def GB_getNumberOfUnitsInZones(self):
         for mapzone in self.objectList:
             set = False
             for player in self.theUI.theBoard.players:
@@ -228,11 +234,11 @@ class UI_Map(UI_Panel):
 
 
     def update(self):
-        self.updateNumberInsideZones()
         self.theUI.screen.blit(self.map,self.myRect)
         mPos = pygame.mouse.get_pos()
         for zone in self.objectList:
-            self.theUI.screen.blit(zone.units,zone.position)
+            offset_position = (zone.position[0]+self.left, zone.position[1]+self.top)
+            self.theUI.screen.blit(zone.units,offset_position)
             maskSize = zone.mask.get_size()
             maskX = mPos[0]-zone.position[0]-self.left
             maskY = mPos[1]-zone.position[1]-self.top
@@ -348,12 +354,14 @@ class UI_SpecialDeck(UI_Panel):
         super().__init__(UI, left, top, width, height, background)
         self.objectList.append(UI_Button("specialDeckBtn",self.theUI,74,50,57,79,(self.left,self.top),"S_BACK"))
 
-    def update(self):
-        ### Actualiza y dibuja el panel y sus elementos. Cada elemento llama a su propio update y draw.
+    def GB_getNewTopCard(self):
         if len(self.theUI.theBoard.discard_deck) > 0:
             buttonImage = self.theUI.theBoard.discard_deck[0]
             #self.topDiscardDeck = pygame.transform.scale()
 
+    def update(self):
+        ### Actualiza y dibuja el panel y sus elementos. Cada elemento llama a su propio update y draw.
+        
         pygame.draw.rect(self.theUI.screen, self.background, self.myRect)
         for object in self.objectList:
             object.update()

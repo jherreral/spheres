@@ -198,7 +198,7 @@ class GameBoard:
     def removeFromPlayerArmy(self,player_id,place,n):
         if self.players[player_id].name != 'Dead':
             if place in self.players[player_id].army:
-                if self.players[player_id].army[place] < n:
+                if self.players[player_id].army[place] <= n:
                     self.players[player_id].army.pop(place)
                 else:
                     self.players[player_id].army[place] -= n
@@ -449,7 +449,8 @@ class GameBoard:
         #if option == 2:
         #    pass
         self.turn_deck.pop(0)
-        self.SendAndWaitSelection(Selection(["Pause"],"Pause"))
+        self.UpdateBoardForUI()
+        #self.SendAndWaitSelection(Selection(["Pause"],"Pause"))
         return current_player_id
 
     def ExecutePlayersMovilization(self):
