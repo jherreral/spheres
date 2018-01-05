@@ -19,10 +19,7 @@ ToGB_queue = queue.Queue()
 
 #Loading data
 theBoard = GameBoard.GameBoard(ToGB_queue, ToUI_queue)
-theBoard.DataBoardParse()
-theBoard.EdgeParse()
-theBoard.CalculateZonesPerSphere()
-theBoard.FirstBoardForUI()
+theBoard.LoadData()
 
 #Start UI thread
 UI_thread = UI.threading.Thread(target=UIThread, args=(ToUI_queue,ToGB_queue,))
@@ -30,13 +27,13 @@ UI_thread.daemon = True
 UI_thread.start()
 
 #Setting the board
-theBoard.PopulateAvailableCapitals()
-theBoard.CreatePlayers(4)
-for i in range(len(theBoard.players)):
-    theBoard.players[i].ListArmy()
-
+#theBoard.BoardSetup(4)
 theBoard.AI_LoadScenario()
+
 theBoard.UpdateBoardForUI()
+
+theBoard.GameLoop()
+
 while theBoard.round < 6:
     theBoard.round += 1
 

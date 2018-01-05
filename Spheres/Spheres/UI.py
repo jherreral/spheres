@@ -124,6 +124,14 @@ class UI:
                     self.receiveQueue.task_done()
                 if typeOfSelection == "MoveAttack":
                     self.objectList.append(SelectionTurn(somethingFromGB.options,typeOfSelection,self.objectList[0],self,260,0,827,568,(100,0,0)))
+                    #El taskdone se debera mover hasta despues de elegir la cantidad de unidades, o agregarlo a la seleccion.
+                    self.receiveQueue.task_done()
+                if typeOfSelection == "2ndSeaMove":
+                    self.objectList.append(SelectionTurn(somethingFromGB.options,typeOfSelection,self.objectList[0],self,260,0,827,568,(100,0,0)))
+                    #El taskdone se debera mover hasta despues de elegir la cantidad de unidades, o agregarlo a la seleccion.
+                    thisSelection = self.objectList[len(self.objectList) - 1]
+                    subSelection = thisSelection.options[0]
+                    thisSelection.SetupDestinationSelection(subSelection.type,subSelection)                  
                     self.receiveQueue.task_done()
             if typeOfObject is GameBoard.GameBoard:
                 self.GB_getInfoAndUpdate(somethingFromGB)
@@ -305,9 +313,10 @@ class SelectionTurn(Selection, UI_Panel):
             for zone in self.theMap.objectList:
                 if zone.name == selectionObject.type:
                     self.objectList.append((selectionObject,zone.copy()))
-        color = (200,200,0)
+        self.color1 = (200,200,0)
+        self.color2 = (250,250,0)
         for dummy,zone in self.objectList:
-            zone.surf.fill(color,None,pygame.BLEND_RGB_MULT)
+            zone.surf.fill(self.color1,None,pygame.BLEND_RGB_MULT)
         self.pressableList = self.objectList
 
     def update(self):
@@ -318,6 +327,16 @@ class SelectionTurn(Selection, UI_Panel):
 
         for dummy,zone in self.objectList:
             self.theUI.screen.blit(zone.surf,zone.rect.move(self.theMap.left,self.theMap.top))
+
+    def SetupDestinationSelection(self,origin,selectionObject):
+        self.selectedOrigin = origin
+        self.pressableList.clear()
+        for option in selectionObject.options:
+            for zone in self.theMap.objectList:
+                if zone.name == option:
+                    self.objectList.append((selectionObject,zone.copy()))
+                    self.objectList[len(self.objectList)-1][1].surf.fill(self.color2,None,pygame.BLEND_RGB_MULT)
+                    self.pressableList.append((selectionObject,zone.copy()))
 
     def pressed(self, event):
         mPos = event.pos
@@ -333,15 +352,8 @@ class SelectionTurn(Selection, UI_Panel):
                         self.selection = (self.selectedOrigin,zone.name,n)
                         break
                     else:
-                        color2 = (250,250,0)
-                        self.selectedOrigin = zone.name
-                        self.pressableList.clear()
-                        for option in selectionObject.options:
-                            for zone in self.theMap.objectList:
-                                if zone.name == option:
-                                    self.objectList.append((selectionObject,zone.copy()))
-                                    self.objectList[len(self.objectList)-1][1].surf.fill(color2,None,pygame.BLEND_RGB_MULT)
-                                    self.pressableList.append((selectionObject,zone.copy()))
+                        self.SetupDestinationSelection(zone.name,selectionObject)
+                        
     
     def sendSelection(self):
         response = Selection(self.options,self.type)

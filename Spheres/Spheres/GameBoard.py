@@ -21,6 +21,7 @@ class Player:
         self.faction = None
         self.army = {}
         self.hand = []
+        self.team = None
 
     def ListArmy(self):
         print("You have units in:\n")
@@ -63,6 +64,30 @@ class GameBoard:
         self.receiveQueue.task_done()
         return response.selection
 
+    def LoadData(self):
+        self.DataBoardParse()
+        self.EdgeParse()
+        self.CalculateZonesPerSphere()
+        self.FirstBoardForUI()
+
+    def BoardSetup(self,n_players):
+        self.PopulateAvailableCapitals()
+        self.CreatePlayers(n_players)
+
+    def GameLoop(self):
+        while self.round < 6:
+            self.round +=1
+
+            self.ArrangeMovilizationDeck()
+            while len(self.movilization_order) > 0:
+                current_player = self.ExecutePlayersMovilization()
+                self.players[current_player].ListArmy()
+
+            self.ArrangeTurnDeck()
+            while len(self.turn_deck) > 0:
+                current_player = self.ExecutePlayersTurn()
+                self.players[current_player].ListArmy()
+
     def DataBoardParse(self):
         f = open("SpheresDataBoard.csv","r")
         for x in range(0, 100):
@@ -103,29 +128,59 @@ class GameBoard:
             self.zones_per_sphere[zone.sphere - 1] = self.zones_per_sphere[zone.sphere - 1] + 1
         return 0
 
-    def ListZoneConnections(self,id):
+    def ListGraphConnections(self,id):
         print("Las conexiones del nodo {}, de nombre '{}' son:\\ ".format(id, self.zones_data[id].nodeName))
-        i = 0
-        while i < len(self.edges_pairs):
-            if self.edges_pairs[i][0] == id:
-                print(self.zones_data[self.edges_pairs[i][1]].nodeName)
-                i = i + 1
-                continue
-            if self.edges_pairs[i][1] == id:
-                print(self.zones_data[self.edges_pairs[i][0]].nodeName)
-            i = i + 1
+        for idx,pair in enumerate(self.edges_pairs):
+            if pair[0] == id:
+                print(self.zones_data[pair[1]].nodeName)
+            elif pair[1] == id:
+                print(self.zones_data[pair[0]].nodeName)
 
-    def ZoneConnections(self,id):
+    def HasArmy(self,id):
+        zone_name = self.zones_data[id].nodeName
+        for player in self.players:
+            if zone_name in player.army:
+                return player.name,player.army[zone_name]
+        return False
+
+    def MapConnections(self,id):
         result = []
-        i = 0
-        while i < len(self.edges_pairs):
-            if self.edges_pairs[i][0] == id:
-                result.append(self.zones_data[self.edges_pairs[i][1]].nodeName)
-                i = i + 1
-                continue
-            if self.edges_pairs[i][1] == id:
-                result.append(self.zones_data[self.edges_pairs[i][0]].nodeName)
-            i = i + 1
+        zones = []
+        d1seas = []
+        for pair in self.edges_pairs:
+            thisID = None
+            if pair[0] == id:
+                thisID = pair[1]
+            elif pair[1] == id:
+                thisID == pair[0]
+            if thisID != None:
+                thisZone = self.zones_data[thisID] 
+                zones.append(thisZone)
+                if thisZone.sphere == 0 and not self.HasArmy(thisID):
+                    d1seas.append(thisID)
+
+        for sea in d1seas:
+            for pair in self.edges_pairs:
+                thisID = None
+                if pair[0] == id:
+                    thisID = pair[1]
+                elif pair[1] == id:
+                    thisID == pair[0]
+                if thisID != None:
+                    thisZone = self.zones_data[thisID] 
+                    if not thisZone in zones and thisZone.sphere == 0:
+                        zones.append(thisZone)
+        for zone in zones:
+            result.append(zone.nodeName)
+        return result
+
+    def GraphConnections(self,id):
+        result = []
+        for idx,pair in enumerate(self.edges_pairs):
+            if pair[0] == id:
+                result.append(self.zones_data[pair[1]].nodeName)
+            elif pair[1] == id:
+                result.append(self.zones_data[pair[0]].nodeName)
         return result
 
     def FindZoneByName(self,name):
@@ -144,13 +199,22 @@ class GameBoard:
 
     def CreateMoveAttackSelection(self,player_id):
         options = []
-        player_zones = list(self.players[player_id].army.keys())
-        possible_origins = []
         for zone in self.players[player_id].army:
-            if self.players[player_id].army[zone] > 1:
-                localOptions = self.ZoneConnections(self.FindZoneByName(zone))
+            if self.players[player_id].army[zone] > 1 or self.zones_data[self.FindZoneByName(zone)].sphere == 0:
+                #localOptions = self.MapConnections(self.FindZoneByName(zone))
+                localOptions = self.GraphConnections(self.FindZoneByName(zone))
                 options.append(Selection(localOptions,zone))
         return Selection(options,"MoveAttack")
+
+    def Create2ndSeaMoveSelection(self,placeA):
+        options = []
+        localOptions = []
+        zones_around = self.GraphConnections(self.FindZoneByName(placeA))
+        for zone in zones_around:
+            if self.zones_data[self.FindZoneByName(zone)].sphere == 0:
+                localOptions.append(zone)
+        options.append(Selection(localOptions,placeA))
+        return Selection(options, "2ndSeaMove")
 
     def CreatePlayers(self,n):
         for player_id in range(n):
@@ -242,7 +306,6 @@ class GameBoard:
                     print("Defender ")
                     (defender_bonus_kills, defender_bonus_blocks) = self.RollBonusDice(defender_bonus_dice)
                     
-
                     attacker_losses = min(attacking_dice_amount, defender_kills + defender_bonus_kills)
                     self.removeFromPlayerArmy(attacker_id,placeA,attacker_losses)
                     print("Attacker loses {} units".format(attacker_losses))
@@ -251,7 +314,7 @@ class GameBoard:
                     self.removeFromPlayerArmy(defender_id,placeB,defender_losses)
                     print("Defender loses {} units".format(defender_losses))
 
-                    if self.players[attacker_id].army[placeA] == 1:
+                    if self.players[attacker_id].army[placeA] == 1 and self.zones_data[self.FindZoneByName(placeA)].sphere != 0:
                         wants_to_attack = False
                         print("No more units to attack.\n")
                         if placeB not in self.players[defender_id].army:
@@ -317,25 +380,26 @@ class GameBoard:
         return (n_kills,n_blocks)
 
     def movePlayerArmy(self,player_id,placeA,placeB,n):
+        print("Trying to move from {} to {}\n".format(placeA, placeB))
         if self.players[player_id].name != 'Dead':
             if placeA in self.players[player_id].army:
-                if(self.players[player_id].army[placeA] - n) < 1:
+                if(self.players[player_id].army[placeA] - n) < 1 and self.zones_data[self.FindZoneByName(placeA)].sphere != 0:
                     print("You do not have enough units to make that action")
                     return 1
                 for i in range(len(self.players)):
                     if placeB in self.players[i].army:
                         if i == player_id:
                            print("It's a valid move. Go on.")
-                           self.players[player_id].army[placeA] = self.players[player_id].army[placeA] - n
-                           self.players[player_id].army[placeB] = self.players[player_id].army[placeB] + n
+                           self.removeFromPlayerArmy(player_id,placeA,n)
+                           self.addToPlayerArmy(player_id,placeB,n)
                         else:
                            print("It's an attack!")
                            self.Combat(placeA, placeB, player_id, i)
                         return 0
                 #It is an empty zone then
                 print("Conquest!!!!")
-                self.players[player_id].army[placeA] = self.players[player_id].army[placeA] - n
-                self.players[player_id].army[placeB] = n
+                self.removeFromPlayerArmy(player_id,placeA,n)
+                self.addToPlayerArmy(player_id,placeB,n)
                 return 0
             else:
                 print("Invalid move. You do not control that territory")
@@ -345,8 +409,8 @@ class GameBoard:
             return 1
 
     def MoveArmyIfTerrainAllows(self, player_id, placeA, placeB, n):
-        print("Trying to move from {} to {}\n".format(placeA, placeB))
-        all_d1_zones = self.ZoneConnections(self.FindZoneByName(placeA))
+        print("Check TerrainAllows from {} to {}\n".format(placeA, placeB))
+        all_d1_zones = self.GraphConnections(self.FindZoneByName(placeA))
         if placeB in all_d1_zones:
             return self.movePlayerArmy(player_id, placeA, placeB, n)
         if self.zones_data[self.FindZoneByName(placeB)].sphere == 0:
@@ -356,7 +420,7 @@ class GameBoard:
                 if self.zones_data[self.FindZoneByName(zone)].sphere == 0:
                     water_d1_zones.append(zone)
             for some_d1_zone in water_d1_zones:
-                some_d2_zones = self.ZoneConnections(some_d1_zone)
+                some_d2_zones = self.GraphConnections(some_d1_zone)
                 for d2zone in some_d2_zones:
                     if not d2zone in all_d2_zones:
                         all_d2_zones.append(d2zone)
@@ -431,23 +495,38 @@ class GameBoard:
             print("{}\n".format(self.players[p].name))
         return 0
 
+    def CheckActionType(self,player_id,placeA,placeB):
+        zoneA_id = self.FindZoneByName(placeA)
+        zoneB_id = self.FindZoneByName(placeB)
+        theArmy = self.HasArmy(zoneB_id)
+
+        if not theArmy:
+            if self.zones_data[zoneB_id].sphere == 0 and self.zones_data[zoneA_id].sphere == 0:
+                return "MoveSeaSea"
+            else:
+                return "MoveTerritory"
+        else:
+            if theArmy[0] == self.players[player_id].name:
+                return "Redeploy"
+            else:
+                return "Attack"
+
     def ExecutePlayersTurn(self):
         current_player_id = self.turn_deck[0]
         print("Now is {}'s turn.\n".format(self.players[current_player_id].name))
         print("You can (1)move/attack or (2)pass:")
         #->CARD TIME
-        decision = self.SendAndWaitSelection(self.CreateMoveAttackSelection(current_player_id))
-        
-        if not decision == "pass":
-            self.MoveArmyIfTerrainAllows(current_player_id,decision[0],decision[1],decision[2])
+        startZone, endZone, nUnits = self.SendAndWaitSelection(self.CreateMoveAttackSelection(current_player_id))
+        actionType = self.CheckActionType(current_player_id,startZone,endZone)
 
-        #option = 1
-        #if option == 1:
-        #    #->Allow some selection of zones to move and which amount
-        #    (origin,destination) = self.AI_ChooseRandomTerrainsToMove(current_player_id)
-        #    self.MoveArmyIfTerrainAllows(current_player_id,origin,destination,1)
-        #if option == 2:
-        #    pass
+        if startZone != None:
+            #self.MoveArmyIfTerrainAllows(current_player_id,startZone,endZone,nUnits)
+            self.movePlayerArmy(current_player_id,startZone,endZone,nUnits)
+
+        if actionType == "MoveSeaSea":
+             startZone2, endZone2, nUnits2 = self.SendAndWaitSelection(self.Create2ndSeaMoveSelection(endZone))
+             self.movePlayerArmy(current_player_id,endZone,endZone2,nUnits2)
+        
         self.turn_deck.pop(0)
         self.UpdateBoardForUI()
         #self.SendAndWaitSelection(Selection(["Pause"],"Pause"))
@@ -487,7 +566,7 @@ class GameBoard:
                 possible_origins.append(x)
         origin = possible_origins[randint(0, len(possible_origins) - 1)]
         origin_ID = self.FindZoneByName(origin)
-        possible_destinations = self.ZoneConnections(origin_ID)
+        possible_destinations = self.GraphConnections(origin_ID)
         destination = possible_destinations[randint(0, len(possible_destinations) - 1)]
         return (origin,destination)
 

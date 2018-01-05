@@ -1,0 +1,11 @@
+Panam - M_CaribeSur				HECHO
+NewYk - Ohio0					HECHO
+Bielo - Novgo					HECHO
+Kazak - Tibet					HECHO
+Hongk - M_deFilipinas				HECHO
+Iran0 - Pakis					HECHO
+M_AtlanticoNorte - M_AtlanticoArtico		HECHO
+X M_Chipre - M_IndicoOeste			HECHO
+M_Chipre - M_Arabigo				HECHO
+M_deArafura - M_deFilipinas			HECHO
+M_PacificoNorte - M_deFilipinas			HECHO
