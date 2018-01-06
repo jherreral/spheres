@@ -331,7 +331,7 @@ class SelectionTurn(Selection, UI_Panel):
     def SetupDestinationSelection(self,origin,selectionObject):
         self.selectedOrigin = origin
         self.pressableList.clear()
-        for option in selectionObject.options:
+        for option in selectionObject.options + [self.selectedOrigin]:
             for zone in self.theMap.objectList:
                 if zone.name == option:
                     self.objectList.append((selectionObject,zone.copy()))
@@ -353,6 +353,7 @@ class SelectionTurn(Selection, UI_Panel):
                         break
                     else:
                         self.SetupDestinationSelection(zone.name,selectionObject)
+                        return
                         
     
     def sendSelection(self):
@@ -452,6 +453,12 @@ class SelectionPanel(Selection,UI_Panel):
             self.width = 200
             self.height = 200
             self.objectList.append(UI_Button(self.options[0],self.theUI,10,10,180,180,(self.left,self.top),self.theUI.FindImage(self.options[0])))
+        
+        #if type == "Quantity":
+        #    self.width = 250
+        #    self.height = 400
+        #    self.objectList
+            
         else:
             self.width = 300
             self.height = 300
@@ -471,6 +478,15 @@ class SelectionPanel(Selection,UI_Panel):
                 self.jobDone = True
                 break
             button.update()
+
+class SelectQuantityPanel(Selection, UI_Panel):
+    def __init__(self, options, type, UI, left, top, width, height, background):
+        Selection.__init__(self,options,type)
+        UI_Panel.__init__(self,UI, left, top, width, height, background)
+
+        nOpts =len(self.options)
+        ### PENDIENTE: Terminar esta clase
+
 
 class UI_Hand(UI_Panel):
     

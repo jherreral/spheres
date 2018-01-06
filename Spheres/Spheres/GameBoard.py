@@ -28,12 +28,6 @@ class Player:
         for x in self.army.keys():
             print("{}:{}\n".format(x,self.army[x]))
  
-class MoveAttackSelection(Selection):
-    def __init__(self, options, type, theBoard):
-        super().__init__(options, type)
-        for idx,option in enumerate(options):
-            options[idx] = Selection(theBoard.ZoneConnections(theBoard.FindZoneByName(option)),"Map")
-
 class GameBoard:
     def __init__(self, receiveQueue, sendQueue):
         self.round = 0
@@ -201,8 +195,8 @@ class GameBoard:
         options = []
         for zone in self.players[player_id].army:
             if self.players[player_id].army[zone] > 1 or self.zones_data[self.FindZoneByName(zone)].sphere == 0:
-                #localOptions = self.MapConnections(self.FindZoneByName(zone))
                 localOptions = self.GraphConnections(self.FindZoneByName(zone))
+                #maxUnitsToMove = self.players[player_id].army[zone]
                 options.append(Selection(localOptions,zone))
         return Selection(options,"MoveAttack")
 
@@ -314,7 +308,7 @@ class GameBoard:
                     self.removeFromPlayerArmy(defender_id,placeB,defender_losses)
                     print("Defender loses {} units".format(defender_losses))
 
-                    if self.players[attacker_id].army[placeA] == 1 and self.zones_data[self.FindZoneByName(placeA)].sphere != 0:
+                    if placeA not in self.players[attacker_id].army:
                         wants_to_attack = False
                         print("No more units to attack.\n")
                         if placeB not in self.players[defender_id].army:
@@ -322,16 +316,28 @@ class GameBoard:
                             print("Resistance rule applied: 1 unit remains in defending zone\n")
                         break
 
-                    if self.players[attacker_id].army[placeA] > 1 and placeB not in self.players[defender_id].army:
-                        self.removeFromPlayerArmy(attacker_id, placeA, attacking_dice_amount - attacker_losses)
-                        self.addToPlayerArmy(attacker_id, placeB, attacking_dice_amount - attacker_losses)
-                        print("{} conquered {}\n".format(self.players[attacker_id].name, placeB))
+                    if self.players[attacker_id].army[placeA] == 1 \
+                    and self.zones_data[self.FindZoneByName(placeA)].sphere != 0:
                         wants_to_attack = False
+                        print("No more units to attack.\n")
+                        if placeB not in self.players[defender_id].army:
+                            addToPlayerArmy(defender_id, placeB, 1)
+                            print("Resistance rule applied: 1 unit remains in defending zone\n")
+                        break
+
+                    if placeB not in self.players[defender_id].army:
+                        if self.players[attacker_id].army[placeA] >= 1 \
+                        and self.zones_data[self.FindZoneByName(placeA)].sphere != 0 \
+                        or self.players[attacker_id].army[placeA] >= 1:
+                            self.removeFromPlayerArmy(attacker_id, placeA, attacking_dice_amount - attacker_losses)
+                            self.addToPlayerArmy(attacker_id, placeB, attacking_dice_amount - attacker_losses)
+                            print("{} conquered {}\n".format(self.players[attacker_id].name, placeB))
+                            wants_to_attack = False
                         break
 
                     print("Keep attacking?")
                     #->Allow retreating
-                    wants_to_attack = bool(randint(0,1))
+                    wants_to_attack = 1
                 else:
                     #->Allow attacker to select number of units/dices
                     units_to_move = self.players[attacker_id].army[placeA] - 1
@@ -340,7 +346,7 @@ class GameBoard:
                     print("{} conquered {}".format(self.players[attacker_id].name, placeB))
                     break
             else:
-                print("Not enoguh miner..units to attack")
+                print("Not enough miner..units to attack")
                 break
 
     @staticmethod
@@ -406,28 +412,6 @@ class GameBoard:
                 return 1
         else:
             print("Those troops lost the will to fight")
-            return 1
-
-    def MoveArmyIfTerrainAllows(self, player_id, placeA, placeB, n):
-        print("Check TerrainAllows from {} to {}\n".format(placeA, placeB))
-        all_d1_zones = self.GraphConnections(self.FindZoneByName(placeA))
-        if placeB in all_d1_zones:
-            return self.movePlayerArmy(player_id, placeA, placeB, n)
-        if self.zones_data[self.FindZoneByName(placeB)].sphere == 0:
-            all_d2_zones = []
-            water_d1_zones = []
-            for zone in all_d1_zones:
-                if self.zones_data[self.FindZoneByName(zone)].sphere == 0:
-                    water_d1_zones.append(zone)
-            for some_d1_zone in water_d1_zones:
-                some_d2_zones = self.GraphConnections(some_d1_zone)
-                for d2zone in some_d2_zones:
-                    if not d2zone in all_d2_zones:
-                        all_d2_zones.append(d2zone)
-            if placeB in all_d2_zones:
-                return self.movePlayerArmy(player_id, placeA, placeB, n)
-        else:
-            print("Invalid movement")
             return 1
 
     def ArrangeTurnDeck(self):
@@ -520,7 +504,6 @@ class GameBoard:
         actionType = self.CheckActionType(current_player_id,startZone,endZone)
 
         if startZone != None:
-            #self.MoveArmyIfTerrainAllows(current_player_id,startZone,endZone,nUnits)
             self.movePlayerArmy(current_player_id,startZone,endZone,nUnits)
 
         if actionType == "MoveSeaSea":
