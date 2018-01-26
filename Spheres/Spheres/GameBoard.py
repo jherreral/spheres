@@ -193,14 +193,17 @@ class GameBoard:
 
     def CreateMoveAttackSelection(self,player_id):
         options = []
+        ranges = []
         for zone in self.players[player_id].army:
             if self.players[player_id].army[zone] > 1 or self.zones_data[self.FindZoneByName(zone)].sphere == 0:
                 localOptions = self.GraphConnections(self.FindZoneByName(zone))
-                #maxUnitsToMove = self.players[player_id].army[zone]
+                maxUnitsToMove = self.players[player_id].army[zone]
+                if self.zones_data[self.FindZoneByName(zone)].sphere != 0:
+                    maxUnitsToMove -= 1
                 options.append(Selection(localOptions,zone))
-        return Selection(options,"MoveAttack")
+        return Selection((options,maxUnitsToMove),"MoveAttack")
 
-    def Create2ndSeaMoveSelection(self,placeA):
+    def Create2ndSeaMoveSelection(self,player_id,placeA):
         options = []
         localOptions = []
         zones_around = self.GraphConnections(self.FindZoneByName(placeA))
@@ -208,7 +211,8 @@ class GameBoard:
             if self.zones_data[self.FindZoneByName(zone)].sphere == 0:
                 localOptions.append(zone)
         options.append(Selection(localOptions,placeA))
-        return Selection(options, "2ndSeaMove")
+        maxUnitsToMove = self.players[player_id].army[placeA]
+        return Selection((options,maxUnitsToMove), "2ndSeaMove")
 
     def CreatePlayers(self,n):
         for player_id in range(n):
@@ -288,10 +292,13 @@ class GameBoard:
                     if not wants_to_attack:
                         break
                     print("Ok. Here we go.")
-                    #->Allow attacker to select number of units/dices
-                    attacking_dice_amount = min(self.players[attacker_id].army[placeA] - 1, 5) \
+                    
+                    max_attacking_dice = min(self.players[attacker_id].army[placeA] - 1, 5) \
                                             if self.zones_data[self.FindZoneByName(placeA)].sphere != 0 \
                                             else min(self.players[attacker_id].army[placeA], 5)
+                    
+                    selected = self.SendAndWaitSelection(Selection(max_attacking_dice,"AttackingDice"))
+                    attacking_dice_amount = selected
                     defending_dice_amount = min(self.players[defender_id].army[placeB], 5)
                     print("Attacker ")
                     attacker_kills = self.RollAndGroupDice(attacking_dice_amount)
@@ -314,6 +321,7 @@ class GameBoard:
                         if placeB not in self.players[defender_id].army:
                             addToPlayerArmy(defender_id, placeB, 1)
                             print("Resistance rule applied: 1 unit remains in defending zone\n")
+                        self.SendAndWaitSelection(Selection(None,"EndCombat"))
                         break
 
                     if self.players[attacker_id].army[placeA] == 1 \
@@ -323,23 +331,30 @@ class GameBoard:
                         if placeB not in self.players[defender_id].army:
                             addToPlayerArmy(defender_id, placeB, 1)
                             print("Resistance rule applied: 1 unit remains in defending zone\n")
+                        self.SendAndWaitSelection(Selection(None,"EndCombat"))
                         break
 
                     if placeB not in self.players[defender_id].army:
                         if self.players[attacker_id].army[placeA] >= 1 \
                         and self.zones_data[self.FindZoneByName(placeA)].sphere != 0 \
-                        or self.players[attacker_id].army[placeA] >= 1:
-                            self.removeFromPlayerArmy(attacker_id, placeA, attacking_dice_amount - attacker_losses)
-                            self.addToPlayerArmy(attacker_id, placeB, attacking_dice_amount - attacker_losses)
+                        or self.players[attacker_id].army[placeA] > 1:
+                            min_conquest_units = attacking_dice_amount - attacker_losses
+                            max_conquest_units = self.players[attacker_id].army[placeA] \
+                                if self.zones_data[self.FindZoneByName(placeA)].sphere == 0 \
+                                else self.players[attacker_id].army[placeA] - 1
+                            selected = self.SendAndWaitSelection(Selection((min_conquest_units,max_conquest_units),"ConquestAmount"))
+                            self.removeFromPlayerArmy(attacker_id, placeA, selected)
+                            self.addToPlayerArmy(attacker_id, placeB, selected)
                             print("{} conquered {}\n".format(self.players[attacker_id].name, placeB))
                             wants_to_attack = False
                         break
 
                     print("Keep attacking?")
-                    #->Allow retreating
-                    wants_to_attack = 1
+                    
+                    selected = self.SendAndWaitSelection(Selection(None,"KeepAttacking"))
+                    wants_to_attack = True
                 else:
-                    #->Allow attacker to select number of units/dices
+                    #->Allow attacker to select number of units to move
                     units_to_move = self.players[attacker_id].army[placeA] - 1
                     self.removeFromPlayerArmy(attacker_id, placeA, units_to_move)
                     self.addToPlayerArmy(attacker_id, placeB, units_to_move)
@@ -507,7 +522,7 @@ class GameBoard:
             self.movePlayerArmy(current_player_id,startZone,endZone,nUnits)
 
         if actionType == "MoveSeaSea":
-             startZone2, endZone2, nUnits2 = self.SendAndWaitSelection(self.Create2ndSeaMoveSelection(endZone))
+             startZone2, endZone2, nUnits2 = self.SendAndWaitSelection(self.Create2ndSeaMoveSelection(current_player_id,endZone))
              self.movePlayerArmy(current_player_id,endZone,endZone2,nUnits2)
         
         self.turn_deck.pop(0)
