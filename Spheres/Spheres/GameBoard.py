@@ -200,8 +200,8 @@ class GameBoard:
                 maxUnitsToMove = self.players[player_id].army[zone]
                 if self.zones_data[self.FindZoneByName(zone)].sphere != 0:
                     maxUnitsToMove -= 1
-                options.append(Selection(localOptions,zone))
-        return Selection((options,maxUnitsToMove),"MoveAttack")
+                options.append(Selection((localOptions,maxUnitsToMove),zone))
+        return Selection(options,"MoveAttack")
 
     def Create2ndSeaMoveSelection(self,player_id,placeA):
         options = []
@@ -210,7 +210,7 @@ class GameBoard:
         for zone in zones_around:
             if self.zones_data[self.FindZoneByName(zone)].sphere == 0:
                 localOptions.append(zone)
-        options.append(Selection(localOptions,placeA))
+        options.append(Selection((localOptions,None),placeA))
         maxUnitsToMove = self.players[player_id].army[placeA]
         return Selection((options,maxUnitsToMove), "2ndSeaMove")
 
@@ -315,6 +315,8 @@ class GameBoard:
                     self.removeFromPlayerArmy(defender_id,placeB,defender_losses)
                     print("Defender loses {} units".format(defender_losses))
 
+                    self.UpdateBoardForUI()
+
                     if placeA not in self.players[attacker_id].army:
                         wants_to_attack = False
                         print("No more units to attack.\n")
@@ -352,7 +354,10 @@ class GameBoard:
                     print("Keep attacking?")
                     
                     selected = self.SendAndWaitSelection(Selection(None,"KeepAttacking"))
-                    wants_to_attack = True
+                    if selected:
+                        wants_to_attack = selected
+                    else:
+                        wants_to_attack = False
                 else:
                     #->Allow attacker to select number of units to move
                     units_to_move = self.players[attacker_id].army[placeA] - 1
@@ -545,6 +550,7 @@ class GameBoard:
             total_units -= number_of_units
             print("{} unit(s) placed in {}. You have {} units left to place".format(number_of_units,zone,total_units))
         self.movilization_order.pop(0)
+        self.UpdateBoardForUI()
         return current_player_id
 
     def AI_ChooseRandomTerrainToReinforce(self,player_id):

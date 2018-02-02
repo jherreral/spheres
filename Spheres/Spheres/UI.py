@@ -129,15 +129,20 @@ class UI:
                     #El taskdone se debera mover hasta despues de elegir la cantidad de unidades, o agregarlo a la seleccion.
                     self.receiveQueue.task_done()
                 if typeOfSelection == "2ndSeaMove":
-                    self.objectList.append(SelectionTurn(somethingFromGB.options,typeOfSelection,self.objectList[0],self,260,0,827,568,(100,0,0)))
-                    #El taskdone se debera mover hasta despues de elegir la cantidad de unidades, o agregarlo a la seleccion.
-                    thisSelection = self.objectList[len(self.objectList) - 1]
-                    subSelection = thisSelection.options[0][0]
-                    thisSelection.SetupDestinationSelection(subSelection.typeOfSelection,subSelection)                  
+                    self.objectList.append(SelectionTurn(somethingFromGB.options,typeOfSelection,self.objectList[0],self,260,0,827,568,(100,0,0),True))
+                    #El taskdone se debera mover hasta despues de elegir la cantidad de unidades, o agregarlo a la seleccion.                
                     self.receiveQueue.task_done()
                 if typeOfSelection == "AttackingDice":
-                    self.objectList.append(UI_CombatPanel(self,200,200,200,400,(20,20,20),somethingFromGB.options))
-                    self.combatPanel = self.objectList[len(self.objectList) - 1]
+                    combatPanelExists = False
+                    for panels in self.objectList:
+                        if type(panels) == UI_CombatPanel:
+                            combatPanelExists = True
+                    if combatPanelExists:
+                        self.combatPanel.maxUnits = somethingFromGB.options
+                    else:
+                        self.objectList.append(UI_CombatPanel(self,100,200,200,400,(20,20,20),somethingFromGB.options))
+                        self.combatPanel = self.objectList[len(self.objectList) - 1]
+                    self.combatPanel.AttackingDice()
                     self.receiveQueue.task_done()
                 if typeOfSelection == "EndCombat":
                     self.combatPanel.EndCombat()
@@ -308,38 +313,36 @@ class SelectionMap(Selection, UI_Panel):
             if maskX in range(0,maskSize[0]) and maskY in range(0,maskSize[1]):
                 if zone.mask.get_at((maskX,maskY)):
                     self.selection = zone.name
-    
-    def sendSelection(self):
-        response = Selection(self.options,self.typeOfSelection)
-        response.setSelection(self.selection)
-        self.theUI.sendQueue.put(response)
+   
 
 class SelectionTurn(Selection, UI_Panel):
-    def __init__(self, options, typeOfSelection, map, UI, left, top, width, height, background):
+    def __init__(self, options, typeOfSelection, map, UI, left, top, width, height, background, seaMove = False):
         Selection.__init__(self,options, typeOfSelection)
         UI_Panel.__init__(self,UI, left, top, width, height, background)
 
         self.theMap = map
         self.objectList = []
         self.pressableList = []
-        self.jobDone = False
         self.selectedOrigin = None
         self.n = 1
         self.maxUnitsToMove = self.options[1]
         self.panelList = []
         self.buttonList = []
-
-        for selectionObject in self.options[0]:
-            for zone in self.theMap.objectList:
-                if zone.name == selectionObject.typeOfSelection:
-                    self.objectList.append((selectionObject,zone.copy()))
         self.color1 = (200,200,0)
         self.color2 = (250,250,0)
-        for dummy,zone in self.objectList:
-            zone.surf.fill(self.color1,None,pygame.BLEND_RGB_MULT)
-        self.pressableList = self.objectList
 
-        self.panelList.append(UI_AmountPanel(self.theUI,550,400,100,300,(0,0,0)))
+        if seaMove:
+            self.pressableList = self.objectList
+            self.panelList.append(UI_AmountPanel(self.theUI,550,400,100,300,(0,0,0),self.options[1]))
+            self.SetupDestinationSelection(self.options[0][0].typeOfSelection,self.options[0][0])
+        else:
+            for selectionObject in self.options:
+                for zone in self.theMap.objectList:
+                    if zone.name == selectionObject.typeOfSelection:
+                        self.objectList.append((selectionObject,zone.copy()))
+            for dummy,zone in self.objectList:
+                zone.surf.fill(self.color1,None,pygame.BLEND_RGB_MULT)
+            self.pressableList = self.objectList
 
     def update(self):
         if not self.selection == None:
@@ -355,8 +358,12 @@ class SelectionTurn(Selection, UI_Panel):
 
     def SetupDestinationSelection(self,origin,selectionObject):
         self.selectedOrigin = origin
-        self.pressableList.clear()
-        for option in selectionObject.options + [self.selectedOrigin]:
+        self.pressableList.clear() # Limpia ambas listas
+        #if type(selectionObject.options) == tuple:
+        destinations = selectionObject.options[0] + [self.selectedOrigin]
+        #else:
+            #destinations = selectionObject.options + [self.selectedOrigin]
+        for option in destinations:
             for zone in self.theMap.objectList:
                 if zone.name == option:
                     self.objectList.append((selectionObject,zone.copy()))
@@ -375,6 +382,7 @@ class SelectionTurn(Selection, UI_Panel):
                         self.selection = (self.selectedOrigin,zone.name,self.panelList[0].n)
                         break
                     else:
+                        self.panelList.append(UI_AmountPanel(self.theUI,550,400,100,300,(0,0,0),selectionObject.options[1]))
                         self.SetupDestinationSelection(zone.name,selectionObject)
                         return
 
@@ -387,11 +395,12 @@ class SelectionTurn(Selection, UI_Panel):
                 button.pressed()
 
 class UI_AmountPanel(UI_Panel):
-    def __init__(self, UI, left, top, width, height, background):
+    def __init__(self, UI, left, top, width, height, background,maxUnits):
         super().__init__(UI, left, top, width, height, background)
         self.objectList.append(UI_Button("Up",self.theUI,0,0,100,50,(self.left,self.top),"UI_Up"))
         self.objectList.append(UI_Button("Down",self.theUI,0,100,100,50,(self.left,self.top),"UI_Down"))
-        self.n = 1
+        self.n = maxUnits
+        self.maxUnits = maxUnits
         self.textsurface = self.theUI.font1.render(str(self.n), False, (255, 255, 255))
         self.textOffset = (50,50)
 
@@ -400,10 +409,10 @@ class UI_AmountPanel(UI_Panel):
         self.theUI.screen.blit(self.textsurface,(self.left + self.textOffset[0],self.top + self.textOffset[1]))
         for button in self.objectList:
             if button.state == 1:
-                if button.buttonName == "Up":
+                if button.buttonName == "Up" and self.n < self.maxUnits:
                     self.n += 1
                     self.textsurface = self.theUI.font1.render(str(self.n), False, (255, 255, 255))
-                else:
+                if button.buttonName == "Down" and self.n > 1:
                     self.n -= 1
                     self.textsurface = self.theUI.font1.render(str(self.n), False, (255, 255, 255))
                 button.state = 0
@@ -413,34 +422,42 @@ class UI_AmountPanel(UI_Panel):
 class UI_CombatPanel(UI_Panel):
     def __init__(self, UI, left, top, width, height, background, dice):
         super().__init__(UI, left, top, width, height, background)
-        self.mode = 0
-        self.n = 1
-        self.maxDice = dice
-        self.objectList.append(self.theUI.font1.render(str(self.n), False, (255, 255, 255)))
+        
         self.textOffset = (100,150)
+        self.maxUnits = dice
+        self.minUnits = 1
+        self.n = self.maxUnits
+
+    def AttackingDice(self):
+        self.mode = 1
+        self.objectList.clear()
+        self.objectList.append(self.theUI.font1.render(str(self.n), False, (255, 255, 255)))
         self.objectList.append(UI_Button("Up",self.theUI,50,100,100,50,(self.left,self.top),"UI_Up"))
         self.objectList.append(UI_Button("Down",self.theUI,50,200,100,50,(self.left,self.top),"UI_Down"))
         self.objectList.append(UI_Button("Ready",self.theUI,50,300,100,50,(self.left,self.top),"UI_Ready"))
+        self.n = self.maxUnits
+        self.objectList[0] = self.theUI.font1.render(str(self.n), False, (255, 255, 255))
 
     def EndCombat(self):
-        self.mode = 1
+        self.mode = 2
         self.objectList.clear()
-        self.objectList.append(UI_Button("Ready",self.theUI,0,250,100,50,(self.left,self.top),"Ready"))
         self.objectList.append(UI_Button("Close",self.theUI,50,200,100,50,(self.left,self.top),"Close"))
 
     def ConquestAmount(self,minMaxUnits):
-        self.mode = 2
+        self.mode = 4
         (self.minUnits,self.maxUnits) = minMaxUnits
         self.objectList.pop()
-        self.objectList.append(UI_Button("ConquerBtn",self.theUI,0,250,100,50,(self.left,self.top),"Conquer"))
+        self.objectList.append(UI_Button("ConquerBtn",self.theUI,50,300,100,50,(self.left,self.top),"Conquer"))
+        self.n = self.maxUnits
+        self.objectList[0] = self.theUI.font1.render(str(self.n), False, (255, 255, 255))
         #Crear texto en panel
         pass
 
     def KeepAttacking(self):
-        self.mode = 3
+        self.mode = 8
         self.objectList.clear()
         self.objectList.append(UI_Button("Attack",self.theUI,0,250,100,50,(self.left,self.top),"Attack"))
-        self.objectList.append(UI_Button("Close",self.theUI,50,200,100,50,(self.left,self.top),"Close"))
+        self.objectList.append(UI_Button("Close",self.theUI,100,250,100,50,(self.left,self.top),"Close"))
 
     def update(self):
         pygame.draw.rect(self.theUI.screen, self.background, self.myRect)
@@ -450,31 +467,31 @@ class UI_CombatPanel(UI_Panel):
                 continue
             if obj.state == 1:
                 if obj.buttonName == "Up":
-                    if self.mode == 2 and self.n < self.maxUnits or self.mode != 2:
+                    if (self.mode & 5) != 0 and self.n < self.maxUnits or (self.mode & 5) == 0:
                         self.n += 1
                         self.objectList[0] = self.theUI.font1.render(str(self.n), False, (255, 255, 255))
                 elif obj.buttonName == "Down":
-                    if self.mode == 2 and self.n > self.minUnits or self.mode != 2:
+                    if (self.mode & 5) != 0 and self.n > self.minUnits or (self.mode & 5) == 0:
                         self.n -= 1
                         self.objectList[0] = self.theUI.font1.render(str(self.n), False, (255, 255, 255))
                 elif obj.buttonName == "Close":
-                    selc = Selection(None,"EndCombat")
-                    selc.selection = None
-                    selc.sendSelection(self.theUI.sendQueue)
-                    selc.jobDone = True
-                    break
+                    auxSelection = Selection(None,"EndCombat")
+                    auxSelection.selection = None
+                    auxSelection.sendSelection(self.theUI.sendQueue)
+                    self.jobDone = True
                 elif obj.buttonName == "ConquerBtn":
-                    selc = Selection(None,"ConquestAmount")
-                    selc.selection = n
-                    selc.sendSelection(self.theUI.sendQueue)
-                    selc.jobDone = True
-                    break
+                    auxSelection = Selection(None,"ConquestAmount")
+                    auxSelection.selection = self.n
+                    auxSelection.sendSelection(self.theUI.sendQueue)
+                    self.jobDone = True
+                elif obj.buttonName == "Attack":
+                    auxSelection = Selection(None,"KeepAttacking")
+                    auxSelection.selection = True
+                    auxSelection.sendSelection(self.theUI.sendQueue)
                 else:
-                    selc = Selection(self.maxDice,"AttackingDice")
-                    selc.selection = self.n
-                    selc.sendSelection(self.theUI.sendQueue)
-                    selc.jobDone = True
-                    break
+                    auxSelection = Selection(self.maxUnits,"AttackingDice")
+                    auxSelection.selection = self.n
+                    auxSelection.sendSelection(self.theUI.sendQueue)
                 obj.state = 0
             obj.update()
 
@@ -518,16 +535,16 @@ class UI_Button:
 
         self.myRect = pygame.Rect(self.screenLeft,self.screenTop,self.width,self.height)
         if not self.theUI.FindImage(image):
-            baseSurface = pygame.Surface((self.width,self.height))
-            HighlightSurface = baseSurface.copy()
-            OnSurface = baseSurface.copy()
-            baseSurface.fill((120,120,120))
-            HighlightSurface.fill((160,160,160))
-            OnSurface.fill((200,200,200))
+            self.buttonOff = pygame.Surface((self.width,self.height))
+            self.buttonHighlight = self.buttonOff.copy()
+            self.buttonOn = self.buttonOff.copy()
+            self.buttonOff.fill((120,120,120))
+            self.buttonHighlight.fill((160,160,160))
+            self.buttonOn.fill((200,200,200))
             textSurface = self.theUI.font1.render(image, False, (0, 0, 0))
-            self.buttonOff = baseSurface.blit(textSurface,(0,0))
-            self.buttonHighlight = HighlightSurface.blit(textSurface,(0,0))
-            self.buttonOn = OnSurface.blit(textSurface,(0,0))
+            self.buttonOff.blit(textSurface,(0,0))
+            self.buttonHighlight.blit(textSurface,(0,0))
+            self.buttonOn.blit(textSurface,(0,0))
         else:
             self.buttonOff = pygame.transform.scale(self.theUI.imageBank[typeOfImage][typeOfImage+"_"+image+"Off"],(self.width,self.height))
             self.buttonHighlight = pygame.transform.scale(self.theUI.imageBank[typeOfImage][typeOfImage+"_"+image+"Highlight"],(self.width,self.height))
@@ -588,11 +605,6 @@ class SelectionPanel(Selection,UI_Panel):
         else:
             self.width = 300
             self.height = 300
-    
-    def sendSelection(self):
-        response = Selection(self.options,self.typeOfSelection)
-        response.setSelection(self.selection)
-        self.theUI.sendQueue.put(response)
 
     def update(self):
         ### Actualiza y dibuja el panel de sUI_Paneleleccion y sus elementos. Cada elemento llama a su propio update y draw.
