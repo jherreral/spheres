@@ -1,9 +1,9 @@
 import queue
 
 class Selection:
-    def __init__(self, options, typeOfSelection):
+    def __init__(self, options, typeOfSelection, choice = None):
         self.options = options
-        self.selection = None
+        self.selection = choice
         self.typeOfSelection = typeOfSelection
 
     def setSelection(self,select):

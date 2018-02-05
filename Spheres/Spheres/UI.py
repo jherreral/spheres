@@ -126,11 +126,9 @@ class UI:
                     self.receiveQueue.task_done()
                 if typeOfSelection == "MoveAttack":
                     self.objectList.append(SelectionTurn(somethingFromGB.options,typeOfSelection,self.objectList[0],self,260,0,827,568,(100,0,0)))
-                    #El taskdone se debera mover hasta despues de elegir la cantidad de unidades, o agregarlo a la seleccion.
                     self.receiveQueue.task_done()
                 if typeOfSelection == "2ndSeaMove":
-                    self.objectList.append(SelectionTurn(somethingFromGB.options,typeOfSelection,self.objectList[0],self,260,0,827,568,(100,0,0),True))
-                    #El taskdone se debera mover hasta despues de elegir la cantidad de unidades, o agregarlo a la seleccion.                
+                    self.objectList.append(SelectionTurn(somethingFromGB.options,typeOfSelection,self.objectList[0],self,260,0,827,568,(100,0,0),True))             
                     self.receiveQueue.task_done()
                 if typeOfSelection == "AttackingDice":
                     combatPanelExists = False
@@ -152,6 +150,9 @@ class UI:
                     self.receiveQueue.task_done()
                 if typeOfSelection == "KeepAttacking":
                     self.combatPanel.KeepAttacking()
+                    self.receiveQueue.task_done()
+                if typeOfSelection == "Mobiliz":
+                    self.objectList.append(SelectionMobiliz(somethingFromGB.options,typeOfSelection,self.objectList[0],self,260,0,827,568,(100,0,0)))
                     self.receiveQueue.task_done()
             if typeOfObject is GameBoard.GameBoard:
                 self.GB_getInfoAndUpdate(somethingFromGB)
@@ -285,7 +286,6 @@ class SelectionMap(Selection, UI_Panel):
         
         self.theMap = map
         self.objectList = []
-        self.jobDone = False
 
         for option in self.options:
             for zone in self.theMap.objectList:
@@ -394,15 +394,64 @@ class SelectionTurn(Selection, UI_Panel):
             if button.myRect.collidepoint(event.pos[0],event.pos[1]):
                 button.pressed()
 
+class SelectionMobiliz(Selection, UI_Panel):
+    def __init__(self, options, typeOfSelection, map, UI, left, top, width, height, background):
+        Selection.__init__(self,options, typeOfSelection)
+        UI_Panel.__init__(self,UI, left, top, width, height, background)
+
+        self.theMap = map
+        self.objectList = []
+        
+        for option in self.options[0]:
+            for zone in self.theMap.objectList:
+                if zone.name == option:
+                    self.objectList.append(zone.copy())
+        color = (200,200,0)
+        for zone in self.objectList:
+            zone.surf.fill(color,None,pygame.BLEND_RGB_MULT)
+
+        self.panel = UI_AmountPanel(self.theUI,self.left,self.top + 300,100,150,(50,50,50),options[1], False)
+
+
+    def update(self):
+        if not self.selection == None:
+            newSelection = Selection(None,"Mobiliz", (self.selection, self.panel.n))
+            newSelection.sendSelection(self.theUI.sendQueue)
+            self.jobDone = True
+            return
+
+        for zone in self.objectList:
+            self.theUI.screen.blit(zone.surf,zone.rect.move(self.theMap.left,self.theMap.top))
+
+        self.panel.update()
+
+    def pressed(self, event):
+        mPos = event.pos
+        for zone in self.objectList:
+            maskSize = zone.mask.get_size()
+            maskX = mPos[0]-zone.position[0]-self.left
+            maskY = mPos[1]-zone.position[1]-self.top
+            if maskX in range(0,maskSize[0]) and maskY in range(0,maskSize[1]):
+                if zone.mask.get_at((maskX,maskY)):
+                    self.selection = zone.name
+
+        for button in self.panel.objectList:
+            if button.myRect.collidepoint(event.pos[0],event.pos[1]):
+                button.pressed()
+
 class UI_AmountPanel(UI_Panel):
-    def __init__(self, UI, left, top, width, height, background,maxUnits):
+    def __init__(self, UI, left, top, width, height, background,maxUnits,startAtMax = True):
         super().__init__(UI, left, top, width, height, background)
         self.objectList.append(UI_Button("Up",self.theUI,0,0,100,50,(self.left,self.top),"UI_Up"))
         self.objectList.append(UI_Button("Down",self.theUI,0,100,100,50,(self.left,self.top),"UI_Down"))
-        self.n = maxUnits
+        if startAtMax:
+            self.n = maxUnits
+        else:
+            self.n = 1
         self.maxUnits = maxUnits
-        self.textsurface = self.theUI.font1.render(str(self.n), False, (255, 255, 255))
-        self.textOffset = (50,50)
+        self.text = str(self.n) + "/" + str(self.maxUnits)
+        self.textsurface = self.theUI.font1.render(self.text, False, (255, 255, 255))
+        self.textOffset = (25,50)
 
     def update(self):
         pygame.draw.rect(self.theUI.screen, self.background, self.myRect)
@@ -411,10 +460,12 @@ class UI_AmountPanel(UI_Panel):
             if button.state == 1:
                 if button.buttonName == "Up" and self.n < self.maxUnits:
                     self.n += 1
-                    self.textsurface = self.theUI.font1.render(str(self.n), False, (255, 255, 255))
+                    self.text = str(self.n) + "/" + str(self.maxUnits)
+                    self.textsurface = self.theUI.font1.render(self.text, False, (255, 255, 255))
                 if button.buttonName == "Down" and self.n > 1:
                     self.n -= 1
-                    self.textsurface = self.theUI.font1.render(str(self.n), False, (255, 255, 255))
+                    self.text = str(self.n) + "/" + str(self.maxUnits)
+                    self.textsurface = self.theUI.font1.render(self.text, False, (255, 255, 255))
                 button.state = 0
             button.update()
         

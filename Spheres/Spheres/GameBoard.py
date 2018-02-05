@@ -203,6 +203,14 @@ class GameBoard:
                 options.append(Selection((localOptions,maxUnitsToMove),zone))
         return Selection(options,"MoveAttack")
 
+    def CreateMobilizationSelection(self,player_id,unitsLeft):
+        options = {}
+        army = copy.deepcopy(self.players[player_id])
+        for zone in self.players[player_id].army:
+            if self.zones_data[self.FindZoneByName(zone)].sphere != 0:
+                options.update(copy.deepcopy({zone:self.players[player_id].army[zone]}))
+        return Selection((options,unitsLeft),"Mobiliz")
+
     def Create2ndSeaMoveSelection(self,player_id,placeA):
         options = []
         localOptions = []
@@ -543,12 +551,13 @@ class GameBoard:
         total_units = 1 + math.floor(prod[current_player_id]/3) + nSph[current_player_id] + nStartLocs[current_player_id]
         print("It's {}'s turn to movilize units! You have {} unit(s) left to place\n".format(self.players[current_player_id].name,total_units))
         while total_units > 0:
-            #->Allow some selection
-            zone = self.AI_ChooseRandomTerrainToReinforce(current_player_id)
-            number_of_units = randint(1, total_units)
+            selected = self.SendAndWaitSelection(self.CreateMobilizationSelection(current_player_id,total_units))
+            zone = selected[0] #self.AI_ChooseRandomTerrainToReinforce(current_player_id)
+            number_of_units = selected[1] #randint(1, total_units)
             self.addToPlayerArmy(current_player_id,zone,number_of_units)
             total_units -= number_of_units
             print("{} unit(s) placed in {}. You have {} units left to place".format(number_of_units,zone,total_units))
+            self.UpdateBoardForUI()
         self.movilization_order.pop(0)
         self.UpdateBoardForUI()
         return current_player_id
