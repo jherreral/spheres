@@ -28,6 +28,46 @@ class Player:
         for x in self.army.keys():
             print("{}:{}\n".format(x,self.army[x]))
  
+class CombatInfo:
+    def __init__(self, placeA,placeB,attackerId,defenderId):
+        self.attackerId = attackerId
+        self.defenderId = defenderId
+        self.placeA = placeA
+        self.placeB = placeB
+        self.baseDefenderBonusDice = None
+        self.willToAttack = True
+        self.maxAttackingUnits = None
+        self.selectedAttackingUnits = None
+        self.cardStage = 1
+
+        self.currentAttackerBonusDice = 0
+        self.currentDefenderBonusDice = 0
+        self.defendingUnits = None
+        self.attackerRoll = None
+        self.defenderRoll = None
+
+        self.attackerDiceKills = None
+        self.attackerModifierKills = 0
+        self.attackerBonusKills = None
+        self.attackerBonusBlocks = None
+        self.attackerLosses = None
+        self.defenderDiceKills = None
+        self.defenderModifierKills = 0
+        self.defenderBonusKills = None
+        self.defenderBonusBlocks = None
+        self.defenderLosses = None
+
+        self.minConquestUnits = None
+        self.maxConquestUnits = None
+        self.selectedConquestUnits = None
+        self.maxMovementUnits = None
+        self.selectedMovementUnits = None
+        self.effects = []
+
+
+
+
+
 class GameBoard:
     def __init__(self, receiveQueue, sendQueue):
         self.round = 0
@@ -283,6 +323,92 @@ class GameBoard:
             print("Player is already dead")
             return 1
 
+    def GetCombatCardsAndEffects(self,ci):
+        return None
+
+
+    def NewCombat(self,placeA,placeB,attackerId,defenderId):
+        ci = CombatInfo(placeA,placeB,attackerId,defenderId)
+        if self.zones_data[self.FindZoneByName(ci.placeA)].sphere != 0:
+            ci.baseDefenderBonusDice = 1
+        else:
+            if self.zones_data[self.FindZoneByName(ci.placeB)].sphere != 0:
+                ci.baseDefenderBonusDice = 2
+            else:
+                ci.baseDefenderBonusDice = 0
+        ci.currentDefenderBonusDice = ci.baseDefenderBonusDice
+
+        while ci.willToAttack:
+            ci.maxAttackingUnits = min(self.players[ci.attackerId].army[ci.placeA] - 1, 5) \
+                                   if self.zones_data[self.FindZoneByName(ci.placeA)].sphere != 0 \
+                                   else min(self.players[ci.attackerId].army[ci.placeA], 5)
+            selected = self.SendAndWaitSelection(Selection(ci.maxAttackingUnits,"AttackingDice"))
+            ci.selectedAttackingUnits = selected
+
+            self.GetCombatCardsAndEffects(ci)
+
+            #Roll dices now
+            print("Attacker ")
+            ci.attackerRoll = self.RollDice(ci.selectedAttackingUnits,ci.currentAttackerBonusDice)
+            
+            ci.defendingUnits = min(self.players[ci.defenderId].army[ci.placeB], 5)
+            print("Defender ")
+            ci.defenderRoll = self.RollDice(ci.defendingUnits,ci.currentDefenderBonusDice)
+            
+            ci.cardStage = 2
+            self.GetCombatCardsAndEffects(ci)
+
+            #Calculate and apply lossees
+            ci.attackerDiceKills = self.CalculateDiceGroups(ci.attackerRoll[0])
+            ci.defenderDiceKills = self.CalculateDiceGroups(ci.defenderRoll[0])
+            (ci.attackerBonusKills,ci.attackerBonusBlocks) = self.CalculateBonusKillsAndBlocks(ci.attackerRoll[1])
+            (ci.defenderBonusKills,ci.defenderBonusBlocks) = self.CalculateBonusKillsAndBlocks(ci.defenderRoll[1])
+            ci.attackerLosses = min(ci.selectedAttackingUnits, \
+                max(0, ci.defenderDiceKills + ci.defenderBonusKills \
+                + ci.defenderModifierKills - ci.attackerBonusBlocks))
+            ci.defenderLosses = min(ci.defendingUnits, \
+                max(0, ci.attackerDiceKills + ci.attackerBonusKills \
+                + ci.attackerModifierKills - ci.defenderBonusBlocks))
+            self.removeFromPlayerArmy(ci.attackerId,ci.placeA,ci.attackerLosses)
+            print("Attacker loses {} units".format(ci.attackerLosses))
+            self.removeFromPlayerArmy(ci.defenderId,ci.placeB,ci.defenderLosses)
+            print("Defender loses {} units".format(ci.defenderLosses))
+            self.UpdateBoardForUI()
+
+            attackingSide = 0 \
+                if ci.placeA not in self.players[ci.attackerId].army \
+                else self.players[ci.attackerId].army[ci.placeA]
+            if self.zones_data[self.FindZoneByName(ci.placeA)].sphere != 0:
+                attackingSide -= 1
+
+            defendingSide = 0 \
+                if ci.placeB not in self.players[ci.defenderId].army \
+                else self.players[ci.defenderId].army[ci.placeB]
+
+            if attackingSide <= 0:
+                ci.willToAttack = False
+                print("No more units to attack.\n")
+                if defendingSide == 0:
+                    addToPlayerArmy(defender_id, placeB, 1)
+                    print("Resistance rule applied: 1 unit remains in defending zone\n")
+                self.SendAndWaitSelection(Selection(None,"EndCombat"))
+            elif defendingSide <= 0:
+                ci.minConquestUnits = ci.selectedAttackingUnits - ci.attackerLosses
+                ci.maxConquestUnits = attackingSide
+                selected = self.SendAndWaitSelection(Selection((ci.minConquestUnits,ci.maxConquestUnits),"ConquestAmount"))
+                self.removeFromPlayerArmy(ci.attackerId, ci.placeA, selected)
+                self.addToPlayerArmy(ci.attackerId, ci.placeB, selected)
+                print("{} conquered {}\n".format(self.players[ci.attackerId].name, ci.placeB))
+                ci.willToAttack = False
+            else:
+                print("Keep attacking?")
+                selected = self.SendAndWaitSelection(Selection(None,"KeepAttacking"))
+                if selected:
+                    ci.willToAttack = selected
+                else:
+                    ci.willToAttack = False
+
+
     def Combat(self,placeA,placeB,attacker_id,defender_id):
         if self.zones_data[self.FindZoneByName(placeA)].sphere != 0:
             defender_bonus_dice = 1
@@ -377,6 +503,54 @@ class GameBoard:
                 print("Not enough miner..units to attack")
                 break
 
+
+    @staticmethod
+    def RollDice(nDice,nBonus):
+        diceResults = []
+        bonusResults = []
+        for i in range(nDice):
+            diceResults.append(randint(1,6))
+        for j in range(nBonus):
+            bonusRoll = randint(0,2)
+            if bonusRoll == 0:
+                bonusResults.append('N')
+            elif bonusRoll == 1:
+                bonusResults.append('B')
+            elif bonusRoll == 2:
+                bonusResults.append('K')
+        print("Rolled dices: {} and bonus: {}\n".format(diceResults,bonusResults))
+        return (diceResults,bonusResults)
+
+    @staticmethod
+    def CalculateDiceGroups(unsortedDice):
+        sortedDice = sorted(unsortedDice)
+        currentSum = 0
+        nGroups = 0
+        while len(sortedDice) > 0:
+            currentSum = sortedDice[len(sortedDice)-1]
+            sortedDice.pop()
+            while len(sortedDice) > 0 or currentSum >= 6:
+                if currentSum >= 6:
+                    nGroups += 1
+                    currentSum = 0
+                    break
+                else:
+                    currentSum += sortedDice[0]
+                    sortedDice.pop(0)
+        print("Got {} groups\n".format(nGroups))
+        return nGroups
+
+    @staticmethod
+    def CalculateBonusKillsAndBlocks(bonusRolledDice):
+        kills = 0
+        blocks = 0
+        for die in bonusRolledDice:
+            if die == 'K':
+                kills += 1
+            elif die == 'B':
+                blocks += 1
+        return (kills, blocks)
+
     @staticmethod
     def RollAndGroupDice(n_dice):
         dice_results = []
@@ -428,7 +602,7 @@ class GameBoard:
                            self.addToPlayerArmy(player_id,placeB,n)
                         else:
                            print("It's an attack!")
-                           self.Combat(placeA, placeB, player_id, i)
+                           self.NewCombat(placeA, placeB, player_id, i)
                         return 0
                 #It is an empty zone then
                 print("Conquest!!!!")

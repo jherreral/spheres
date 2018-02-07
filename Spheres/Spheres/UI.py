@@ -169,9 +169,10 @@ class UI:
             self.objectList.clear()
             pygame.quit()
             return True
-        mouseButtonEvents = pygame.event.get(pygame.MOUSEBUTTONDOWN)
-        if mouseButtonEvents:
-            lastMouseButtonEvent = mouseButtonEvents[len(mouseButtonEvents)-1]
+        mouseButtonUpEvents = pygame.event.get(pygame.MOUSEBUTTONUP)
+        mouseButtonDownEvents = pygame.event.get(pygame.MOUSEBUTTONDOWN)
+        if mouseButtonDownEvents:
+            lastMouseButtonEvent = mouseButtonDownEvents[len(mouseButtonDownEvents)-1]
             for panel in self.objectList:
                 if panel.myRect.collidepoint(lastMouseButtonEvent.pos[0],lastMouseButtonEvent.pos[1]):
                     panel.pressed(lastMouseButtonEvent)
@@ -390,9 +391,10 @@ class SelectionTurn(Selection, UI_Panel):
             if button.myRect.collidepoint(event.pos[0],event.pos[1]):
                 button.pressed()
 
-        for button in self.panelList[0].objectList:
-            if button.myRect.collidepoint(event.pos[0],event.pos[1]):
-                button.pressed()
+        if len(self.panelList) > 0:
+            for button in self.panelList[0].objectList:
+                if button.myRect.collidepoint(event.pos[0],event.pos[1]):
+                    button.pressed()
 
 class SelectionMobiliz(Selection, UI_Panel):
     def __init__(self, options, typeOfSelection, map, UI, left, top, width, height, background):
