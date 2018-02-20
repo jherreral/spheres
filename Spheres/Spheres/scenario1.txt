@@ -1,6 +1,7 @@
 2
 3
-Harturo,Total,6
+Harturo,Total,6,11
+Comba,AntiA,Carri,Heavy,Drone,Bomba,Speci,Elite,Spark,SubSt,Snipe
 Brasi
 3
 Chile
@@ -13,7 +14,8 @@ Panam
 1
 Mexic
 5
-Bernardo,Milit,7
+Bernardo,Milit,7,10
+Comba,Carri,Heavy,Drone,Bomba,Speci,Elite,Spark,SubSt,Snipe
 Calif
 4
 Texas
@@ -28,7 +30,8 @@ NtCan
 2
 Alask
 3
-Carolina,Inter,5
+Carolina,Inter,5,10
+Comba,AntiA,Carri,Drone,Bomba,Speci,Elite,Spark,SubSt,Snipe
 Ausst
 2
 Sydne

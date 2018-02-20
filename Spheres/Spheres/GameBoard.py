@@ -64,12 +64,117 @@ class CombatInfo:
         self.selectedMovementUnits = None
         self.effects = []
 
+class CardManager:
+    def __init__(self,gb):
+        self.cardMethods = {'Comba':self.CombatCopter,
+                            'AntiA':self.AntiAir,
+                            'Carri':self.CarrierSupport,
+                            'Heavy':self.HeavyArmor,
+                            'Drone':self.Drone,
+                            'Bomba':self.Bombard,
+                            'Speci':self.SpecialForces,
+                            'Elite':self.EliteUnit,
+                            'Spark':self.SparkUnrest,
+                            'SubSt':self.SubStrike,
+                            'Snipe':self.Sniper,
+                            }
+        self.cardStages = {'Comba':2,
+                            'AntiA':1,
+                            'Carri':3,
+                            'Heavy':2,
+                            'Drone':1,
+                            'Bomba':1,
+                            'Speci':3,
+                            'Elite':2,
+                            'Spark':1,
+                            'SubSt':9,
+                            'Snipe':2,
+                            }
+        self.rejected = []
+        self.gb = gb
 
+    def playCard(self,name,player,**kwargs):
+        try:
+            self.cardMethods[name](player,**kwargs)
+        except:
+            print("Method doesnt exist")
+        
+    def isApplicable(self,card,ci):
+        if self.cardStages[card] & ci.cardStage != 0:
+            return True
+        else:
+            return False
 
+    def CombatCopter(self,player,ci):
+        print("CombatCopter")
+        #Send selection with dices
+        cardFromAttacker = True if player == self.gb.players[ci.attackerId].name \
+                    else False
+        aux_roll = ci.defenderRoll if cardFromAttacker \
+            else ci.attackerRoll
+        roll = aux_roll[0]+aux_roll[1]
+        self.gb.sendQueue.put(Selection(roll,"DiceSelection"))
+        self.gb.sendQueue.join()
+        response = self.gb.receiveQueue.get()
+        self.gb.receiveQueue.task_done()
+        roll = response.selection
+        a = []
+        b = []
+        for die in roll:
+            if type(die) == int:
+                a.append(die)
+            else:
+                b.append(die)
+        if cardFromAttacker:
+            ci.defenderRoll = (a,b)
+        else:
+            ci.attackerRoll = (a,b)
+        
 
+    @staticmethod
+    def AntiAir(player,ci):
+        print("AntiAir")
+
+    @staticmethod
+    def CarrierSupport(player,ci):
+        print("CarrierSupport")
+
+    @staticmethod
+    def HeavyArmor(player,ci):
+        print("HeavyArmor")
+
+    @staticmethod
+    def Drone(player,ci):
+        print("Drone")
+    
+    @staticmethod
+    def Bombard(player,ci):
+        print("Bombard")
+    
+    @staticmethod
+    def SpecialForces(player,ci):
+        print("SpecialForces")
+    
+    @staticmethod
+    def EliteUnit(player,ci):
+        print("EliteUnit")
+    
+    @staticmethod
+    def SparkUnrest(player,ci):
+        print("SparkUnrest")
+    
+    @staticmethod
+    def SubStrike(player,ci):
+        print("SubStrike")
+
+    @staticmethod
+    def Sniper(player,ci):
+        print("Sniper")
+
+    
 
 class GameBoard:
-    def __init__(self, receiveQueue, sendQueue):
+    def __init__(self, receiveQueue, sendQueue, cardQueue):
         self.round = 0
         self.zones_data = []
         self.edges_pairs = []
@@ -83,6 +188,8 @@ class GameBoard:
         self.startLocations = []
         self.receiveQueue = receiveQueue
         self.sendQueue = sendQueue
+        self.cardQueue = cardQueue
+        self.cardManager = CardManager(self)
 
     def FirstBoardForUI(self):
         self.sendQueue.put(self)
@@ -323,7 +430,25 @@ class GameBoard:
             print("Player is already dead")
             return 1
 
-    def GetCombatCardsAndEffects(self,ci):
+    def GetCombatCardsAndEffects(self,combatInfo):
+        #Create pause time to play cards
+        self.SendAndWaitSelection(Selection(None,"CardTime"))
+        #Get cards from Q and apply them
+        applicableCards = []
+        rejectedCards = []
+        allCardsFromUI = []
+        while not self.cardQueue.empty():
+            allCardsFromUI.append(self.cardQueue.get())
+            self.cardQueue.task_done()
+        for eachCard in allCardsFromUI:
+            if self.cardManager.isApplicable(eachCard[0],combatInfo):
+                applicableCards.append(eachCard)
+            else:
+                rejectedCards.append(eachCard)
+        for x in applicableCards:
+            (card,player) = x
+            self.cardManager.playCard(card,player, ci = combatInfo)
+        #Get effects from CI and apply them
         return None
 
 
@@ -345,7 +470,7 @@ class GameBoard:
             selected = self.SendAndWaitSelection(Selection(ci.maxAttackingUnits,"AttackingDice"))
             ci.selectedAttackingUnits = selected
 
-            self.GetCombatCardsAndEffects(ci)
+            #self.GetCombatCardsAndEffects(ci)
 
             #Roll dices now
             print("Attacker ")
@@ -502,7 +627,6 @@ class GameBoard:
             else:
                 print("Not enough miner..units to attack")
                 break
-
 
     @staticmethod
     def RollDice(nDice,nBonus):
@@ -764,12 +888,21 @@ class GameBoard:
         nPlayers = int(f.readline())
         for i in range(nPlayers):
             self.players.append(Player())
+            #Get name,faction and number of zones
             aux = f.readline()
             aux = aux.rstrip()
             aux2 = aux.split(",")
-            (name,faction,nZones) = (aux2[0],aux2[1],int(aux2[2]))
+            (name,faction,nZones,nCards) = (aux2[0],aux2[1],int(aux2[2]),int(aux2[3]))
             self.players[i].name = name
             self.players[i].faction = faction
+            #Get cards in hand
+            if nCards != 0:
+                aux = f.readline()
+                aux = aux.rstrip()
+                aux2 = aux.split(",")
+                for card in aux2:
+                    self.players[i].hand.append(card)
+            #Get zones
             for j in range(nZones):
                 zone = f.readline()
                 zone = zone.rstrip()

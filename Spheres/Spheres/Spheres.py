@@ -3,11 +3,10 @@ import UI
 import queue
 from random import randint
 
-def UIThread(receiveQueue, sendQueue):
+def UIThread(receiveQueue, sendQueue,cardQueue):
     ### Run UI in this thread
-    theUI = UI.UI(receiveQueue, sendQueue)
+    theUI = UI.UI(receiveQueue, sendQueue,cardQueue)
     theUI.loadImages()
-    theUI.CreatePanels()
     theUI.startUI()
     UIdone = False
     while not UIdone:
@@ -16,13 +15,14 @@ def UIThread(receiveQueue, sendQueue):
 #Create queue objects for thread communication
 ToUI_queue = queue.Queue()
 ToGB_queue = queue.Queue()
+cardQueue = queue.Queue()
 
 #Loading data
-theBoard = GameBoard.GameBoard(ToGB_queue, ToUI_queue)
+theBoard = GameBoard.GameBoard(ToGB_queue, ToUI_queue, cardQueue)
 theBoard.LoadData()
 
 #Start UI thread
-UI_thread = UI.threading.Thread(target=UIThread, args=(ToUI_queue,ToGB_queue,))
+UI_thread = UI.threading.Thread(target=UIThread, args=(ToUI_queue,ToGB_queue,cardQueue,))
 UI_thread.daemon = True
 UI_thread.start()
 
